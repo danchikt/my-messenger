@@ -11,8 +11,12 @@ const server = http.createServer(app);
 // Создаем сервер WebSockets
 const wss = new WebSocket.Server({ server });
 
-// Склад для хранения всех подключившихся клиентов
+// Хранилище подключений: id пользователя -> WebSocket
 const clients = new Map();
+
+// Хранилище друзей (в реальном проекте здесь будет база данных)
+// Формат: { userId: [список друзей] }
+const friendships = {};
 
 // Это событие срабатывает, когда кто-то подключается
 wss.on('connection', (ws) => {
@@ -33,10 +37,25 @@ wss.on('connection', (ws) => {
                     clients.set(userId, ws);
                     console.log(`👤 Пользователь ${userId} авторизован`);
                     
+                    // Отправляем подтверждение
                     ws.send(JSON.stringify({ 
                         type: 'auth_success', 
                         userId: userId 
                     }));
+                    
+                    // Отправляем список друзей (если есть)
+                    if (friendships[userId]) {
+                        const friendsList = friendships[userId].map(friendId => ({
+                            id: friendId,
+                            name: friendId,
+                            status: clients.has(friendId) ? 'online' : 'offline'
+                        }));
+                        
+                        ws.send(JSON.stringify({
+                            type: 'friends_list',
+                            friends: friendsList
+                        }));
+                    }
                     break;
 
                 // ===== ОТПРАВКА СООБЩЕНИЯ =====
@@ -110,7 +129,18 @@ wss.on('connection', (ws) => {
                     const { requesterId } = data;
                     console.log(`✅ Заявка принята: ${requesterId} -> ${userId}`);
                     
-                    // Отправляем уведомление
+                    // Сохраняем дружбу
+                    if (!friendships[userId]) friendships[userId] = [];
+                    if (!friendships[requesterId]) friendships[requesterId] = [];
+                    
+                    if (!friendships[userId].includes(requesterId)) {
+                        friendships[userId].push(requesterId);
+                    }
+                    if (!friendships[requesterId].includes(userId)) {
+                        friendships[requesterId].push(userId);
+                    }
+                    
+                    // Отправляем уведомление тому, кто отправил заявку
                     const requesterSocket = clients.get(requesterId);
                     if (requesterSocket) {
                         requesterSocket.send(JSON.stringify({
@@ -118,7 +148,31 @@ wss.on('connection', (ws) => {
                             by: userId,
                             message: `Пользователь ${userId} принял вашу заявку`
                         }));
+                        
+                        // Отправляем обновленный список друзей отправителю
+                        const requesterFriends = friendships[requesterId].map(friendId => ({
+                            id: friendId,
+                            name: friendId,
+                            status: clients.has(friendId) ? 'online' : 'offline'
+                        }));
+                        
+                        requesterSocket.send(JSON.stringify({
+                            type: 'friends_list',
+                            friends: requesterFriends
+                        }));
                     }
+                    
+                    // Отправляем обновленный список друзей текущему пользователю
+                    const currentUserFriends = friendships[userId].map(friendId => ({
+                        id: friendId,
+                        name: friendId,
+                        status: clients.has(friendId) ? 'online' : 'offline'
+                    }));
+                    
+                    ws.send(JSON.stringify({
+                        type: 'friends_list',
+                        friends: currentUserFriends
+                    }));
                     
                     ws.send(JSON.stringify({
                         type: 'notification',

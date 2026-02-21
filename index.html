@@ -25,6 +25,7 @@
             --border: #e4e6eb;
             --error: #f15b6f;
             --success: #31c4b2;
+            --warning: #f39c12;
         }
 
         body {
@@ -298,6 +299,15 @@
             margin-left: 8px;
         }
 
+        .group-badge {
+            background: var(--secondary);
+            color: white;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+        }
+
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -327,6 +337,13 @@
             background: var(--surface);
             border: 1px solid var(--border);
             border-bottom-left-radius: 4px;
+        }
+
+        .message-sender {
+            font-size: 11px;
+            font-weight: 600;
+            margin-bottom: 4px;
+            color: var(--primary);
         }
 
         .message-time {
@@ -476,6 +493,14 @@
             background: #f0f2f5;
         }
 
+        .chat-menu-item.danger {
+            color: var(--error);
+        }
+
+        .chat-menu-item.warning {
+            color: var(--warning);
+        }
+
         .profile-header {
             background: var(--surface);
             border-radius: 20px;
@@ -617,6 +642,8 @@
             padding: 24px;
             width: 90%;
             max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .modal-title {
@@ -638,6 +665,7 @@
             display: flex;
             gap: 12px;
             justify-content: flex-end;
+            margin-top: 20px;
         }
 
         .modal-button {
@@ -656,6 +684,60 @@
         .modal-button-secondary {
             background: var(--border);
             color: var(--text);
+        }
+
+        .modal-button-danger {
+            background: var(--error);
+            color: white;
+        }
+
+        .members-list {
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 16px;
+        }
+
+        .member-item {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .member-item:last-child {
+            border-bottom: none;
+        }
+
+        .member-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+
+        .member-info {
+            flex: 1;
+        }
+
+        .member-name {
+            font-weight: 600;
+        }
+
+        .member-role {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .remove-member {
+            color: var(--error);
+            cursor: pointer;
+            padding: 8px;
         }
 
         .notification-container {
@@ -695,6 +777,10 @@
 
         .notification.error {
             border-left-color: var(--error);
+        }
+
+        .notification.warning {
+            border-left-color: var(--warning);
         }
 
         .notification-buttons {
@@ -883,6 +969,7 @@
                     <span>🔍</span>
                     <input type="text" id="searchContacts" placeholder="Поиск контактов...">
                     <button id="addFriendBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">➕</button>
+                    <button id="createGroupBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">👥</button>
                 </div>
                 <div id="contactsList" class="contacts-list"></div>
             </div>
@@ -950,6 +1037,40 @@
         </div>
     </div>
 
+    <div id="createGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Создать группу</div>
+            <input type="text" id="groupName" class="modal-input" placeholder="Название группы">
+            <input type="text" id="groupDescription" class="modal-input" placeholder="Описание (необязательно)">
+            <div class="modal-buttons">
+                <button id="createGroupCancel" class="modal-button modal-button-secondary">Отмена</button>
+                <button id="createGroupConfirm" class="modal-button modal-button-primary">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="addToGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Добавить участников</div>
+            <input type="text" id="searchContactsForGroup" class="modal-input" placeholder="Поиск контактов...">
+            <div id="contactsForGroupList" class="members-list"></div>
+            <div class="modal-buttons">
+                <button id="addToGroupCancel" class="modal-button modal-button-secondary">Отмена</button>
+                <button id="addToGroupConfirm" class="modal-button modal-button-primary">Добавить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="groupMembersModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Участники группы</div>
+            <div id="groupMembersList" class="members-list"></div>
+            <div class="modal-buttons">
+                <button id="groupMembersClose" class="modal-button modal-button-secondary">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
     <div id="editProfileModal" class="modal">
         <div class="modal-content">
             <div class="modal-title">Редактировать профиль</div>
@@ -982,12 +1103,15 @@
         let contacts = [];
         let messages = JSON.parse(localStorage.getItem('messages')) || {};
         let currentChat = null;
+        let groups = JSON.parse(localStorage.getItem('groups')) || [];
+        let groupMembers = {};
         let socket = null;
         let currentTab = 'contacts';
         let pendingRequests = [];
         let notifications = JSON.parse(localStorage.getItem('notifications')) || [];
         let channelStats = { subscribers: 1, views: 0 };
         let blockedUsers = JSON.parse(localStorage.getItem('blockedUsers')) || [];
+        let selectedContactsForGroup = [];
 
         const statusEl = document.getElementById('statusDisplay');
         const authButton = document.getElementById('authButton');
@@ -1021,6 +1145,7 @@
         const contactsList = document.getElementById('contactsList');
         const searchContacts = document.getElementById('searchContacts');
         const addFriendBtn = document.getElementById('addFriendBtn');
+        const createGroupBtn = document.getElementById('createGroupBtn');
         
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
@@ -1043,6 +1168,22 @@
         const addFriendInput = document.getElementById('addFriendInput');
         const addFriendConfirm = document.getElementById('addFriendConfirm');
         const addFriendCancel = document.getElementById('addFriendCancel');
+        
+        const createGroupModal = document.getElementById('createGroupModal');
+        const groupName = document.getElementById('groupName');
+        const groupDescription = document.getElementById('groupDescription');
+        const createGroupConfirm = document.getElementById('createGroupConfirm');
+        const createGroupCancel = document.getElementById('createGroupCancel');
+        
+        const addToGroupModal = document.getElementById('addToGroupModal');
+        const searchContactsForGroup = document.getElementById('searchContactsForGroup');
+        const contactsForGroupList = document.getElementById('contactsForGroupList');
+        const addToGroupConfirm = document.getElementById('addToGroupConfirm');
+        const addToGroupCancel = document.getElementById('addToGroupCancel');
+        
+        const groupMembersModal = document.getElementById('groupMembersModal');
+        const groupMembersList = document.getElementById('groupMembersList');
+        const groupMembersClose = document.getElementById('groupMembersClose');
         
         const editProfileModal = document.getElementById('editProfileModal');
         const editName = document.getElementById('editName');
@@ -1087,6 +1228,10 @@
 
         function saveMessages() {
             localStorage.setItem('messages', JSON.stringify(messages));
+        }
+
+        function saveGroups() {
+            localStorage.setItem('groups', JSON.stringify(groups));
         }
 
         function showConfirm(title, message, onConfirm) {
@@ -1136,7 +1281,7 @@
         };
 
         function openChatFromNotification(chatId) {
-            const contact = contacts.find(c => c.id === chatId) || { id: chatId, name: chatId };
+            const contact = contacts.find(c => c.id === chatId) || groups.find(g => g.id === chatId) || { id: chatId, name: chatId };
             openChat(contact);
             if (notificationPopup) { notificationPopup.remove(); notificationPopup = null; }
         }
@@ -1233,7 +1378,6 @@
                     chatId: contactId
                 }));
                 
-                // Очищаем локально сразу для отзывчивости
                 if (messages[contactId]) {
                     messages[contactId] = [];
                     saveMessages();
@@ -1257,7 +1401,6 @@
                     type: 'clear_channel'
                 }));
                 
-                // Очищаем локально
                 if (messages['channel']) {
                     messages['channel'] = [];
                     saveMessages();
@@ -1270,12 +1413,144 @@
             });
         }
 
+        // ========== ФУНКЦИИ ДЛЯ ГРУПП ==========
+        function createGroup() {
+            createGroupModal.classList.add('active');
+        }
+
+        function addToGroup() {
+            if (!currentChat || !currentChat.id.startsWith('group_')) return;
+            
+            selectedContactsForGroup = [];
+            renderContactsForGroup();
+            addToGroupModal.classList.add('active');
+        }
+
+        function renderContactsForGroup() {
+            const searchTerm = searchContactsForGroup?.value?.toLowerCase() || '';
+            const filtered = contacts.filter(c => 
+                (c.name || '').toLowerCase().includes(searchTerm) || 
+                (c.username || '').toLowerCase().includes(searchTerm)
+            );
+            
+            contactsForGroupList.innerHTML = '';
+            
+            filtered.forEach(contact => {
+                const isSelected = selectedContactsForGroup.includes(contact.id);
+                const div = document.createElement('div');
+                div.className = 'member-item';
+                div.onclick = () => toggleContactSelection(contact.id);
+                div.innerHTML = `
+                    <div class="member-avatar">${getInitials(contact.name || contact.username)}</div>
+                    <div class="member-info">
+                        <div class="member-name">${contact.name || contact.username}</div>
+                    </div>
+                    <input type="checkbox" ${isSelected ? 'checked' : ''} style="width: 20px; height: 20px;">
+                `;
+                contactsForGroupList.appendChild(div);
+            });
+        }
+
+        function toggleContactSelection(contactId) {
+            const index = selectedContactsForGroup.indexOf(contactId);
+            if (index === -1) {
+                selectedContactsForGroup.push(contactId);
+            } else {
+                selectedContactsForGroup.splice(index, 1);
+            }
+            renderContactsForGroup();
+        }
+
+        function showGroupMembers() {
+            if (!currentChat || !currentChat.id.startsWith('group_')) return;
+            
+            const group = groups.find(g => g.id === currentChat.id);
+            if (!group) return;
+            
+            const members = group.members || [];
+            let html = '';
+            
+            members.forEach(memberId => {
+                const member = contacts.find(c => c.id === memberId) || { name: memberId };
+                const isCreator = memberId === group.createdBy;
+                html += `
+                    <div class="member-item">
+                        <div class="member-avatar">${getInitials(member.name || memberId)}</div>
+                        <div class="member-info">
+                            <div class="member-name">${member.name || memberId}</div>
+                            <div class="member-role">${isCreator ? '👑 Создатель' : 'Участник'}</div>
+                        </div>
+                        ${!isCreator && currentUser.id === group.createdBy ? 
+                            `<span class="remove-member" onclick="kickFromGroup('${memberId}')">✕</span>` : ''}
+                    </div>
+                `;
+            });
+            
+            groupMembersList.innerHTML = html;
+            groupMembersModal.classList.add('active');
+        }
+
+        function kickFromGroup(memberId) {
+            if (!currentChat || !socket) return;
+            
+            showConfirm('Исключить участника', 'Вы уверены, что хотите исключить этого участника из группы?', () => {
+                socket.send(JSON.stringify({
+                    type: 'kick_from_group',
+                    groupId: currentChat.id,
+                    memberId: memberId
+                }));
+                
+                // Локально обновляем список участников
+                const group = groups.find(g => g.id === currentChat.id);
+                if (group && group.members) {
+                    group.members = group.members.filter(id => id !== memberId);
+                    saveGroups();
+                }
+                
+                showGroupMembers();
+                showNotification('Участник исключен', 'success');
+            });
+        }
+
+        function deleteGroup() {
+            if (!currentChat || !currentChat.id.startsWith('group_')) return;
+            
+            showConfirm('Удалить группу', 'Вы уверены, что хотите удалить группу? Это действие нельзя отменить.', () => {
+                if (socket) {
+                    socket.send(JSON.stringify({
+                        type: 'delete_group',
+                        groupId: currentChat.id
+                    }));
+                    
+                    groups = groups.filter(g => g.id !== currentChat.id);
+                    saveGroups();
+                    
+                    showScreen('contacts');
+                    showNotification('Группа удалена', 'info');
+                }
+            });
+        }
+
         function updateChatMenu() {
             if (!currentChat) { chatMenu.style.display = 'none'; return; }
+            
             let menuHtml = '';
+            
             if (currentChat.id === 'channel') {
                 if (currentUser && currentUser.id === 'admin') {
                     menuHtml += `<div class="chat-menu-item" onclick="clearChannel()"><span>🧹</span> Очистить канал</div>`;
+                }
+            } else if (currentChat.id.startsWith('group_')) {
+                const group = groups.find(g => g.id === currentChat.id);
+                if (group) {
+                    menuHtml += `<div class="chat-menu-item" onclick="showGroupMembers()"><span>👥</span> Участники (${group.members?.length || 1})</div>`;
+                    if (currentUser.id === group.createdBy) {
+                        menuHtml += `<div class="chat-menu-item" onclick="addToGroup()"><span>➕</span> Добавить участников</div>`;
+                        menuHtml += `<div class="chat-menu-item danger" onclick="deleteGroup()"><span>🗑️</span> Удалить группу</div>`;
+                    } else {
+                        menuHtml += `<div class="chat-menu-item danger" onclick="leaveGroup()"><span>🚪</span> Покинуть группу</div>`;
+                    }
+                    menuHtml += `<div class="chat-menu-item" onclick="clearChat('${currentChat.id}')"><span>🧹</span> Очистить чат</div>`;
                 }
             } else {
                 const isBlocked = blockedUsers.includes(currentChat.id);
@@ -1287,6 +1562,7 @@
                     menuHtml += `<div class="chat-menu-item" onclick="blockContact('${currentChat.id}')"><span>🔒</span> Заблокировать</div>`;
                 }
             }
+            
             chatMenu.innerHTML = menuHtml;
         }
 
@@ -1321,9 +1597,17 @@
                 return;
             }
             if (contact.id === 'channel') { openChannel(); return; }
+            
             currentChat = contact;
             chatName.textContent = contact.name || contact.username;
-            chatStatus.textContent = contact.status === 'online' ? 'в сети' : 'не в сети';
+            
+            if (contact.id.startsWith('group_')) {
+                const group = groups.find(g => g.id === contact.id);
+                chatStatus.textContent = `${group?.members?.length || 1} участников`;
+            } else {
+                chatStatus.textContent = contact.status === 'online' ? 'в сети' : 'не в сети';
+            }
+            
             if (!messages[contact.id]) messages[contact.id] = [];
             renderMessages();
             chatInput.disabled = false;
@@ -1333,11 +1617,14 @@
 
         function renderMessages() {
             if (!currentChat) return;
+            
             chatMessages.innerHTML = '';
             const chatMessagesList = messages[currentChat.id] || [];
+            
             chatMessagesList.forEach(msg => {
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `message ${msg.from === currentUser.id ? 'message-mine' : 'message-other'}`;
+                
                 let content = '';
                 if (msg.fileData) {
                     if (msg.fileType?.startsWith('image/')) {
@@ -1348,6 +1635,13 @@
                 } else {
                     content = msg.text;
                 }
+                
+                let senderHtml = '';
+                if (currentChat.id.startsWith('group_') && msg.from !== currentUser.id) {
+                    const sender = contacts.find(c => c.id === msg.from) || { name: msg.from };
+                    senderHtml = `<div class="message-sender">${sender.name || msg.from}</div>`;
+                }
+                
                 let reactionsHtml = '';
                 if (msg.reactions && Object.keys(msg.reactions).length > 0) {
                     reactionsHtml = '<div class="message-reactions">';
@@ -1356,21 +1650,40 @@
                     }
                     reactionsHtml += '</div>';
                 }
-                msgDiv.innerHTML = `<div>${content}</div><div class="message-time">${formatTime(msg.timestamp)}</div>${reactionsHtml}`;
+                
+                msgDiv.innerHTML = `${senderHtml}<div>${content}</div><div class="message-time">${formatTime(msg.timestamp)}</div>${reactionsHtml}`;
                 chatMessages.appendChild(msgDiv);
             });
+            
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
         function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null) {
             if (blockedUsers.includes(from) && from !== currentUser.id) return;
             if (!messages[to]) messages[to] = [];
-            const message = { id: 'msg_' + Date.now() + Math.random(), from, text, timestamp: timestamp || new Date().toISOString(), reactions: {} };
-            if (fileData) { message.fileData = fileData; message.fileName = fileName; message.fileType = fileType; }
+            
+            const message = { 
+                id: 'msg_' + Date.now() + Math.random(), 
+                from, 
+                text, 
+                timestamp: timestamp || new Date().toISOString(), 
+                reactions: {} 
+            };
+            
+            if (fileData) { 
+                message.fileData = fileData; 
+                message.fileName = fileName; 
+                message.fileType = fileType; 
+            }
+            
             messages[to].push(message);
             saveMessages();
-            if (currentChat && (currentChat.id === to || (currentChat.id === 'channel' && to === 'channel'))) renderMessages();
-            if (from !== currentUser?.id && !blockedUsers.includes(from)) {
+            
+            if (currentChat && (currentChat.id === to || (currentChat.id === 'channel' && to === 'channel'))) {
+                renderMessages();
+            }
+            
+            if (from !== currentUser?.id && !blockedUsers.includes(from) && !to.startsWith('group_')) {
                 const sender = contacts.find(c => c.id === from) || { name: from };
                 addNotification({ from: sender.name || from, text: text || '📎 Файл', timestamp: message.timestamp, chatId: to });
             }
@@ -1382,18 +1695,34 @@
             chatsScreen.classList.remove('active');
             profileScreen.classList.remove('active');
             tabButtons.forEach(btn => btn.classList.remove('active'));
+            
             switch(screenName) {
-                case 'auth': authScreen.classList.add('active'); break;
-                case 'contacts': contactsScreen.classList.add('active'); document.querySelector('[data-tab="contacts"]').classList.add('active'); break;
-                case 'chats': chatsScreen.classList.add('active'); document.querySelector('[data-tab="chats"]').classList.add('active'); break;
-                case 'profile': profileScreen.classList.add('active'); document.querySelector('[data-tab="profile"]').classList.add('active'); break;
+                case 'auth': 
+                    authScreen.classList.add('active'); 
+                    break;
+                case 'contacts': 
+                    contactsScreen.classList.add('active'); 
+                    document.querySelector('[data-tab="contacts"]').classList.add('active'); 
+                    break;
+                case 'chats': 
+                    chatsScreen.classList.add('active'); 
+                    document.querySelector('[data-tab="chats"]').classList.add('active'); 
+                    break;
+                case 'profile': 
+                    profileScreen.classList.add('active'); 
+                    document.querySelector('[data-tab="profile"]').classList.add('active'); 
+                    break;
             }
             currentTab = screenName;
         }
 
         async function login(email, password) {
             try {
-                const res = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ login: email, password }) });
+                const res = await fetch('/api/login', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ login: email, password }) 
+                });
                 const data = await res.json();
                 if (data.success) {
                     token = data.token;
@@ -1412,7 +1741,11 @@
 
         async function register(email, username, password, name, bio) {
             try {
-                const res = await fetch('/api/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, username, password, name, bio }) });
+                const res = await fetch('/api/register', { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ email, username, password, name, bio }) 
+                });
                 const data = await res.json();
                 if (data.success) {
                     token = data.token;
@@ -1432,14 +1765,17 @@
         function connectWebSocket() {
             const wsUrl = `wss://${window.location.host}`;
             socket = new WebSocket(wsUrl);
+            
             socket.onopen = () => {
                 statusEl.className = 'status-connected';
                 statusEl.innerHTML = '🟢 Подключено';
                 socket.send(JSON.stringify({ type: 'auth', token }));
             };
+            
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 console.log('📨', data);
+                
                 switch(data.type) {
                     case 'auth_success':
                         currentUser = { ...currentUser, ...data.user };
@@ -1487,7 +1823,6 @@
                         break;
                         
                     case 'chat_cleared':
-                        // Очищаем сообщения в чате у получателя
                         if (messages[data.chatId]) {
                             messages[data.chatId] = [];
                             saveMessages();
@@ -1499,7 +1834,6 @@
                         break;
                         
                     case 'channel_cleared':
-                        // Очищаем сообщения в канале у всех подписчиков
                         if (messages['channel']) {
                             messages['channel'] = [];
                             saveMessages();
@@ -1510,11 +1844,69 @@
                         showNotification('Канал был очищен администратором', 'warning');
                         break;
                         
+                    case 'group_created':
+                        if (data.group) {
+                            groups.push(data.group);
+                            saveGroups();
+                            updateContacts();
+                            showNotification(`Группа "${data.group.name}" создана`, 'success');
+                        }
+                        break;
+                        
+                    case 'group_members_added':
+                        if (data.groupId) {
+                            const group = groups.find(g => g.id === data.groupId);
+                            if (group && data.members) {
+                                if (!group.members) group.members = [];
+                                group.members = [...new Set([...group.members, ...data.members])];
+                                saveGroups();
+                                if (currentChat && currentChat.id === data.groupId) {
+                                    chatStatus.textContent = `${group.members.length} участников`;
+                                }
+                            }
+                        }
+                        showNotification('Новые участники добавлены', 'success');
+                        break;
+                        
+                    case 'member_kicked':
+                        if (data.groupId && data.memberId === currentUser?.id) {
+                            // Текущего пользователя исключили
+                            groups = groups.filter(g => g.id !== data.groupId);
+                            saveGroups();
+                            updateContacts();
+                            if (currentChat && currentChat.id === data.groupId) {
+                                showScreen('contacts');
+                            }
+                            showNotification('Вас исключили из группы', 'warning');
+                        } else if (data.groupId) {
+                            // Обновляем список участников
+                            const group = groups.find(g => g.id === data.groupId);
+                            if (group && group.members) {
+                                group.members = group.members.filter(id => id !== data.memberId);
+                                saveGroups();
+                                if (currentChat && currentChat.id === data.groupId) {
+                                    chatStatus.textContent = `${group.members.length} участников`;
+                                }
+                            }
+                        }
+                        break;
+                        
+                    case 'group_deleted':
+                        groups = groups.filter(g => g.id !== data.groupId);
+                        saveGroups();
+                        updateContacts();
+                        if (currentChat && currentChat.id === data.groupId) {
+                            showScreen('contacts');
+                        }
+                        showNotification('Группа удалена', 'info');
+                        break;
+                        
                     case 'error':
                         showNotification(data.message, 'error');
                         break;
                 }
             };
+            
             socket.onclose = () => {
                 statusEl.className = 'status-disconnected';
                 statusEl.innerHTML = '🔴 Не подключено';
@@ -1537,12 +1929,31 @@
         function updateContacts() {
             const searchTerm = searchContacts?.value?.toLowerCase() || '';
             contactsList.innerHTML = '';
+            
+            // Канал
             const channelEl = document.createElement('div');
             channelEl.className = 'contact-item';
             channelEl.innerHTML = `<div class="contact-avatar" style="background: var(--primary);">📢</div><div class="contact-info"><div class="contact-name">Clock Messenger <span class="verified-badge">✅</span></div><div class="contact-status">${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров</div></div>`;
             channelEl.onclick = openChannel;
             contactsList.appendChild(channelEl);
-            const filtered = contacts.filter(c => (c.name || '').toLowerCase().includes(searchTerm) || (c.username || '').toLowerCase().includes(searchTerm));
+            
+            // Группы
+            groups.forEach(group => {
+                if (group.name.toLowerCase().includes(searchTerm)) {
+                    const groupEl = document.createElement('div');
+                    groupEl.className = 'contact-item';
+                    groupEl.innerHTML = `<div class="contact-avatar" style="background: var(--secondary);">👥</div><div class="contact-info"><div class="contact-name">${group.name} <span class="group-badge">группа</span></div><div class="contact-status">${group.members?.length || 1} участников</div></div>`;
+                    groupEl.onclick = () => openChat(group);
+                    contactsList.appendChild(groupEl);
+                }
+            });
+            
+            // Контакты
+            const filtered = contacts.filter(c => 
+                (c.name || '').toLowerCase().includes(searchTerm) || 
+                (c.username || '').toLowerCase().includes(searchTerm)
+            );
+            
             filtered.forEach(contact => {
                 const isBlocked = blockedUsers.includes(contact.id);
                 const el = document.createElement('div');
@@ -1551,10 +1962,12 @@
                 el.onclick = () => openChat(contact);
                 contactsList.appendChild(el);
             });
+            
             contactsCount.textContent = filtered.length;
-            channelsCount.textContent = 1;
+            channelsCount.textContent = 1 + groups.length;
         }
 
+        // ========== ОБРАБОТЧИКИ СОБЫТИЙ ==========
         authButton.onclick = () => showScreen('auth');
         
         loginTab.onclick = () => {
@@ -1573,7 +1986,13 @@
         
         loginSubmit.onclick = () => login(loginEmail.value, loginPassword.value);
         
-        registerSubmit.onclick = () => register(registerEmail.value, registerUsername.value, registerPassword.value, registerName.value, registerBio.value);
+        registerSubmit.onclick = () => register(
+            registerEmail.value, 
+            registerUsername.value, 
+            registerPassword.value, 
+            registerName.value, 
+            registerBio.value
+        );
         
         addFriendBtn.onclick = () => addFriendModal.classList.add('active');
         
@@ -1591,6 +2010,80 @@
             }
         };
         
+        createGroupBtn.onclick = () => createGroup();
+        
+        createGroupCancel.onclick = () => {
+            createGroupModal.classList.remove('active');
+            groupName.value = '';
+            groupDescription.value = '';
+        };
+        
+        createGroupConfirm.onclick = () => {
+            const name = groupName.value.trim();
+            if (!name) {
+                showNotification('Введите название группы', 'error');
+                return;
+            }
+            
+            if (socket) {
+                const groupId = 'group_' + Date.now();
+                const newGroup = {
+                    id: groupId,
+                    name: name,
+                    description: groupDescription.value.trim(),
+                    createdBy: currentUser.id,
+                    members: [currentUser.id],
+                    createdAt: new Date().toISOString()
+                };
+                
+                socket.send(JSON.stringify({
+                    type: 'create_group',
+                    group: newGroup
+                }));
+                
+                groups.push(newGroup);
+                saveGroups();
+                updateContacts();
+                
+                createGroupModal.classList.remove('active');
+                groupName.value = '';
+                groupDescription.value = '';
+                
+                showNotification('Группа создана', 'success');
+            }
+        };
+        
+        addToGroupCancel.onclick = () => {
+            addToGroupModal.classList.remove('active');
+            selectedContactsForGroup = [];
+        };
+        
+        addToGroupConfirm.onclick = () => {
+            if (socket && currentChat && selectedContactsForGroup.length > 0) {
+                socket.send(JSON.stringify({
+                    type: 'add_to_group',
+                    groupId: currentChat.id,
+                    members: selectedContactsForGroup
+                }));
+                
+                const group = groups.find(g => g.id === currentChat.id);
+                if (group) {
+                    if (!group.members) group.members = [];
+                    group.members = [...new Set([...group.members, ...selectedContactsForGroup])];
+                    saveGroups();
+                    chatStatus.textContent = `${group.members.length} участников`;
+                }
+                
+                addToGroupModal.classList.remove('active');
+                selectedContactsForGroup = [];
+                showNotification('Участники добавлены', 'success');
+            }
+        };
+        
+        groupMembersClose.onclick = () => {
+            groupMembersModal.classList.remove('active');
+        };
+        
         editProfileBtn.onclick = () => {
             editName.value = currentUser.name || '';
             editBio.value = currentUser.bio || '';
@@ -1601,7 +2094,11 @@
         
         editProfileConfirm.onclick = () => {
             if (socket) {
-                socket.send(JSON.stringify({ type: 'update_profile', name: editName.value, bio: editBio.value }));
+                socket.send(JSON.stringify({ 
+                    type: 'update_profile', 
+                    name: editName.value, 
+                    bio: editBio.value 
+                }));
                 currentUser.name = editName.value;
                 currentUser.bio = editBio.value;
                 updateUIForUser();
@@ -1614,7 +2111,13 @@
             if (!socket || !currentChat || !chatInput.value) return;
             const text = chatInput.value.trim();
             if (!text) return;
-            socket.send(JSON.stringify({ type: 'message', to: currentChat.id, text: text }));
+            
+            socket.send(JSON.stringify({ 
+                type: 'message', 
+                to: currentChat.id, 
+                text: text 
+            }));
+            
             addMessage(currentUser.id, currentChat.id, text);
             chatInput.value = '';
         };
@@ -1624,6 +2127,7 @@
         });
         
         searchContacts?.addEventListener('input', updateContacts);
+        searchContactsForGroup?.addEventListener('input', renderContactsForGroup);
         
         tabButtons.forEach(btn => {
             btn.onclick = () => showScreen(btn.dataset.tab);
@@ -1640,6 +2144,7 @@
             if (socket && currentUser) socket.send(JSON.stringify({ type: 'get_channel_stats' }));
         }, 30000);
 
+        // Инициализация
         if (token) {
             connectWebSocket();
             showScreen('contacts');
@@ -1649,6 +2154,7 @@
     </script>
 </body>
 </html>
+
 
 
 

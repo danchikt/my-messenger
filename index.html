@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#8774e1">
     <link rel="manifest" href="/manifest.json">
-    <title>Мой Мессенджер</title>
+    <title>Clock Messenger</title>
     <style>
         * {
             margin: 0;
@@ -146,7 +146,7 @@
         }
 
         /* Экраны */
-        .auth-screen, .contacts-screen, .chats-screen, .profile-screen, .channel-screen {
+        .auth-screen, .contacts-screen, .chats-screen, .profile-screen {
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -326,6 +326,20 @@
             text-align: right;
         }
 
+        .message-reactions {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px;
+            font-size: 12px;
+        }
+
+        .reaction {
+            background: rgba(0,0,0,0.05);
+            padding: 2px 6px;
+            border-radius: 12px;
+            cursor: pointer;
+        }
+
         .chat-input-area {
             display: flex;
             gap: 8px;
@@ -355,6 +369,20 @@
             background: var(--primary);
             color: white;
             border: none;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .attach-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--surface);
+            color: var(--primary);
+            border: 1px solid var(--border);
             font-size: 20px;
             cursor: pointer;
             display: flex;
@@ -477,43 +505,13 @@
         }
 
         /* Канал */
-        .channel-header {
-            background: var(--surface);
-            border-radius: 20px;
-            padding: 20px;
-            text-align: center;
-            margin-bottom: 16px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
-
-        .channel-badge {
-            background: var(--primary);
-            color: white;
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            display: inline-block;
+        .channel-stats {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
             margin-top: 8px;
-        }
-
-        .channel-message {
-            background: var(--surface);
-            border-radius: 12px;
-            padding: 12px;
-            margin-bottom: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-        }
-
-        .channel-message-author {
-            font-weight: 600;
-            color: var(--primary);
-            margin-bottom: 4px;
-        }
-
-        .channel-message-time {
-            font-size: 11px;
+            font-size: 12px;
             color: var(--text-secondary);
-            margin-top: 4px;
         }
 
         /* Табы */
@@ -651,8 +649,8 @@
             display: none !important;
         }
 
-        /* Попап заявок */
-        .requests-popup {
+        /* Попап уведомлений */
+        .notifications-popup {
             position: fixed;
             top: 80px;
             right: 16px;
@@ -679,19 +677,24 @@
             }
         }
 
-        .request-item {
+        .notification-item {
             padding: 12px;
             border-bottom: 1px solid var(--border);
             display: flex;
             align-items: center;
             gap: 12px;
+            cursor: pointer;
         }
 
-        .request-item:last-child {
+        .notification-item:last-child {
             border-bottom: none;
         }
 
-        .request-avatar {
+        .notification-item:hover {
+            background: #f0f2f5;
+        }
+
+        .notification-avatar {
             width: 40px;
             height: 40px;
             border-radius: 50%;
@@ -704,45 +707,53 @@
             flex-shrink: 0;
         }
 
-        .request-content {
+        .notification-content {
             flex: 1;
         }
 
-        .request-name {
+        .notification-title {
             font-weight: 600;
             margin-bottom: 4px;
             font-size: 14px;
         }
 
-        .request-text {
+        .notification-text {
             font-size: 12px;
             color: var(--text-secondary);
-            margin-bottom: 8px;
         }
 
-        .request-actions {
-            display: flex;
-            gap: 8px;
+        .notification-time {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 4px;
         }
 
-        .request-btn {
-            padding: 6px 12px;
-            border: none;
+        /* Загрузка файлов */
+        .file-preview {
+            max-width: 200px;
+            max-height: 200px;
             border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
+            margin-top: 8px;
+        }
+
+        .file-message {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             cursor: pointer;
-            transition: opacity 0.2s;
         }
 
-        .request-btn-accept {
-            background: var(--success);
-            color: white;
+        .file-icon {
+            font-size: 24px;
         }
 
-        .request-btn-decline {
-            background: var(--error);
-            color: white;
+        .file-name {
+            font-size: 12px;
+            color: var(--text-secondary);
         }
     </style>
 </head>
@@ -799,6 +810,7 @@
                     <span>🔍</span>
                     <input type="text" id="searchContacts" placeholder="Поиск контактов...">
                     <button id="addFriendBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">➕</button>
+                    <button id="createGroupBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">👥</button>
                 </div>
                 <div id="contactsList" class="contacts-list"></div>
             </div>
@@ -815,6 +827,7 @@
                 </div>
                 <div id="chatMessages" class="chat-messages"></div>
                 <div class="chat-input-area">
+                    <button class="attach-btn" id="attachFileBtn">📎</button>
                     <input type="text" id="chatInput" class="chat-input" placeholder="Сообщение..." disabled>
                     <button id="sendMessageBtn" class="chat-send" disabled>➤</button>
                 </div>
@@ -846,26 +859,11 @@
             </div>
         </div>
 
-        <div id="channelScreen" class="main-content">
-            <div class="channel-screen">
-                <div class="channel-header">
-                    <h2>📢 Официальный канал</h2>
-                    <span class="channel-badge">✅ Официальный</span>
-                </div>
-                <div id="channelMessages" style="flex: 1; overflow-y: auto; margin-bottom: 12px;"></div>
-                <div id="channelInputArea" class="hidden" style="display: flex; gap: 8px; padding: 8px 0;">
-                    <input type="text" id="channelInput" class="auth-input" placeholder="Написать в канал..." style="margin: 0;">
-                    <button id="sendChannelBtn" class="auth-submit" style="width: auto; padding: 0 20px; margin: 0;">➤</button>
-                </div>
-            </div>
-        </div>
-
         <!-- Нижние табы -->
         <div class="bottom-tabs">
             <button class="tab-button active" data-tab="contacts">👥 Контакты</button>
             <button class="tab-button" data-tab="chats">💬 Чаты</button>
             <button class="tab-button" data-tab="profile">👤 Профиль</button>
-            <button class="tab-button" data-tab="channel">📢 Канал</button>
         </div>
     </div>
 
@@ -877,6 +875,18 @@
             <div class="modal-buttons">
                 <button id="addFriendCancel" class="modal-button modal-button-secondary">Отмена</button>
                 <button id="addFriendConfirm" class="modal-button modal-button-primary">Добавить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="createGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Создать группу</div>
+            <input type="text" id="groupName" class="modal-input" placeholder="Название группы">
+            <input type="text" id="groupDescription" class="modal-input" placeholder="Описание">
+            <div class="modal-buttons">
+                <button id="createGroupCancel" class="modal-button modal-button-secondary">Отмена</button>
+                <button id="createGroupConfirm" class="modal-button modal-button-primary">Создать</button>
             </div>
         </div>
     </div>
@@ -902,12 +912,17 @@
         let token = localStorage.getItem('token');
         let currentUser = null;
         let contacts = [];
-        let messages = {};
+        let messages = JSON.parse(localStorage.getItem('messages')) || {};
         let currentChat = null;
-        let channelMessages = [];
+        let groups = JSON.parse(localStorage.getItem('groups')) || [];
         let socket = null;
         let currentTab = 'contacts';
         let pendingRequests = [];
+        let notifications = JSON.parse(localStorage.getItem('notifications')) || [];
+        let channelStats = {
+            subscribers: 1,
+            views: 0
+        };
 
         // ========== DOM ЭЛЕМЕНТЫ ==========
         const statusEl = document.getElementById('statusDisplay');
@@ -920,7 +935,6 @@
         const contactsScreen = document.getElementById('contactsScreen');
         const chatsScreen = document.getElementById('chatsScreen');
         const profileScreen = document.getElementById('profileScreen');
-        const channelScreen = document.getElementById('channelScreen');
         
         const tabButtons = document.querySelectorAll('.tab-button');
         
@@ -945,11 +959,13 @@
         const contactsList = document.getElementById('contactsList');
         const searchContacts = document.getElementById('searchContacts');
         const addFriendBtn = document.getElementById('addFriendBtn');
+        const createGroupBtn = document.getElementById('createGroupBtn');
         
         // Чат
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendMessageBtn = document.getElementById('sendMessageBtn');
+        const attachFileBtn = document.getElementById('attachFileBtn');
         const chatName = document.getElementById('chatName');
         const chatStatus = document.getElementById('chatStatus');
         
@@ -962,17 +978,17 @@
         const channelsCount = document.getElementById('channelsCount');
         const editProfileBtn = document.getElementById('editProfileBtn');
         
-        // Канал
-        const channelMessagesList = document.getElementById('channelMessages');
-        const channelInput = document.getElementById('channelInput');
-        const sendChannelBtn = document.getElementById('sendChannelBtn');
-        const channelInputArea = document.getElementById('channelInputArea');
-        
         // Модальные окна
         const addFriendModal = document.getElementById('addFriendModal');
         const addFriendInput = document.getElementById('addFriendInput');
         const addFriendConfirm = document.getElementById('addFriendConfirm');
         const addFriendCancel = document.getElementById('addFriendCancel');
+        
+        const createGroupModal = document.getElementById('createGroupModal');
+        const groupName = document.getElementById('groupName');
+        const groupDescription = document.getElementById('groupDescription');
+        const createGroupConfirm = document.getElementById('createGroupConfirm');
+        const createGroupCancel = document.getElementById('createGroupCancel');
         
         const editProfileModal = document.getElementById('editProfileModal');
         const editName = document.getElementById('editName');
@@ -1011,57 +1027,58 @@
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         }
 
+        function saveMessages() {
+            localStorage.setItem('messages', JSON.stringify(messages));
+        }
+
         // ========== СИСТЕМА УВЕДОМЛЕНИЙ ==========
-        function showFriendRequestNotification(request) {
-            pendingRequests.push(request);
+        function addNotification(notification) {
+            notifications.unshift(notification);
+            if (notifications.length > 50) notifications.pop();
+            localStorage.setItem('notifications', JSON.stringify(notifications));
             updateNotificationBell();
             
-            showNotification(`Новая заявка от ${request.fromName}`, 'info');
+            // Показываем всплывающее уведомление
+            showNotification(notification.text, 'info');
         }
 
         function updateNotificationBell() {
-            if (pendingRequests.length > 0) {
+            if (notifications.length > 0) {
                 notificationBell.style.display = 'block';
-                notificationCount.textContent = pendingRequests.length;
+                notificationCount.textContent = notifications.length;
             } else {
                 notificationBell.style.display = 'none';
             }
         }
 
-        // Исправленный обработчик для колокольчика
         notificationBell.onclick = (e) => {
-            e.stopPropagation(); // Чтобы событие не уходило дальше
+            e.stopPropagation();
             
-            // Если попап уже открыт — закрываем его
             if (notificationPopup) {
                 notificationPopup.remove();
                 notificationPopup = null;
                 return;
             }
             
-            // Создаём новый попап
             notificationPopup = document.createElement('div');
-            notificationPopup.className = 'requests-popup';
+            notificationPopup.className = 'notifications-popup';
             
             let html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">';
-            html += '<h3 style="font-size: 16px;">Заявки в друзья</h3>';
+            html += '<h3 style="font-size: 16px;">Уведомления</h3>';
             html += '<span style="cursor: pointer; font-size: 18px;" onclick="this.parentElement.parentElement.remove(); notificationPopup = null;">✕</span>';
             html += '</div>';
             
-            if (pendingRequests.length === 0) {
-                html += '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Нет новых заявок</p>';
+            if (notifications.length === 0) {
+                html += '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Нет уведомлений</p>';
             } else {
-                pendingRequests.forEach(req => {
+                notifications.forEach(notif => {
                     html += `
-                        <div class="request-item">
-                            <div class="request-avatar">${getInitials(req.fromName)}</div>
-                            <div class="request-content">
-                                <div class="request-name">${req.fromName}</div>
-                                <div class="request-text">хочет добавить вас в друзья</div>
-                                <div class="request-actions">
-                                    <button class="request-btn request-btn-accept" onclick="acceptRequest('${req.from}')">✓ Принять</button>
-                                    <button class="request-btn request-btn-decline" onclick="declineRequest('${req.from}')">✗ Отклонить</button>
-                                </div>
+                        <div class="notification-item" onclick="window.location.href='#${notif.chatId}'">
+                            <div class="notification-avatar">${getInitials(notif.from)}</div>
+                            <div class="notification-content">
+                                <div class="notification-title">${notif.from}</div>
+                                <div class="notification-text">${notif.text}</div>
+                                <div class="notification-time">${formatTime(notif.timestamp)}</div>
                             </div>
                         </div>
                     `;
@@ -1072,46 +1089,132 @@
             document.body.appendChild(notificationPopup);
         };
 
-        window.acceptRequest = function(requesterId) {
-            if (socket) {
-                socket.send(JSON.stringify({
-                    type: 'accept_friend',
-                    requesterId: requesterId
-                }));
+        // ========== ЗАГРУЗКА ФАЙЛОВ ==========
+        attachFileBtn.onclick = () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*,video/*,application/pdf';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
                 
-                pendingRequests = pendingRequests.filter(r => r.from !== requesterId);
-                updateNotificationBell();
-                
-                if (notificationPopup) {
-                    notificationPopup.remove();
-                    notificationPopup = null;
-                }
-                
-                showNotification('Вы приняли заявку', 'success');
-            }
+                const reader = new FileReader();
+                reader.onload = () => {
+                    if (currentChat && socket) {
+                        socket.send(JSON.stringify({
+                            type: 'file_message',
+                            to: currentChat.id,
+                            fileName: file.name,
+                            fileType: file.type,
+                            fileData: reader.result
+                        }));
+                    }
+                };
+                reader.readAsDataURL(file);
+            };
+            input.click();
         };
 
-        window.declineRequest = function(requesterId) {
-            if (socket) {
+        // ========== РЕАКЦИИ ==========
+        function addReaction(messageId, reaction) {
+            if (socket && currentChat) {
                 socket.send(JSON.stringify({
-                    type: 'decline_friend',
-                    requesterId: requesterId
+                    type: 'reaction',
+                    messageId: messageId,
+                    reaction: reaction,
+                    chatId: currentChat.id
                 }));
-                
-                pendingRequests = pendingRequests.filter(r => r.from !== requesterId);
-                updateNotificationBell();
-                
-                if (notificationPopup) {
-                    notificationPopup.remove();
-                    notificationPopup = null;
-                }
-                
-                showNotification('Заявка отклонена', 'info');
             }
+        }
+
+        // ========== ГРУППЫ ==========
+        createGroupBtn.onclick = () => {
+            createGroupModal.classList.add('active');
         };
+
+        createGroupCancel.onclick = () => {
+            createGroupModal.classList.remove('active');
+            groupName.value = '';
+            groupDescription.value = '';
+        };
+
+        createGroupConfirm.onclick = () => {
+            const name = groupName.value.trim();
+            const desc = groupDescription.value.trim();
+            
+            if (!name) {
+                showNotification('Введите название группы', 'error');
+                return;
+            }
+            
+            const groupId = 'group_' + Date.now();
+            const group = {
+                id: groupId,
+                name: name,
+                description: desc,
+                members: [currentUser.id],
+                createdBy: currentUser.id,
+                createdAt: new Date().toISOString()
+            };
+            
+            groups.push(group);
+            localStorage.setItem('groups', JSON.stringify(groups));
+            
+            contacts.push({
+                id: groupId,
+                name: name,
+                username: groupId,
+                type: 'group',
+                members: 1
+            });
+            
+            updateContacts();
+            createGroupModal.classList.remove('active');
+            groupName.value = '';
+            groupDescription.value = '';
+            
+            showNotification('Группа создана', 'success');
+        };
+
+        // ========== КАНАЛ ==========
+        function openChannel() {
+            currentChat = {
+                id: 'channel',
+                name: 'Clock Messenger',
+                type: 'channel',
+                verified: true
+            };
+            
+            chatName.innerHTML = 'Clock Messenger <span style="color: var(--primary);">✅</span>';
+            chatStatus.innerHTML = `${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров`;
+            
+            if (!messages['channel']) {
+                messages['channel'] = [];
+            }
+            
+            renderMessages();
+            
+            // Увеличиваем счётчик просмотров
+            channelStats.views++;
+            
+            chatInput.disabled = true;
+            sendMessageBtn.disabled = true;
+            
+            if (currentUser && currentUser.id === 'admin') {
+                chatInput.disabled = false;
+                sendMessageBtn.disabled = false;
+            }
+            
+            showScreen('chats');
+        }
 
         // ========== ЧАТ ==========
         function openChat(contact) {
+            if (contact.id === 'channel') {
+                openChannel();
+                return;
+            }
+            
             currentChat = contact;
             chatName.textContent = contact.name || contact.username;
             chatStatus.textContent = contact.status === 'online' ? 'в сети' : 'не в сети';
@@ -1137,22 +1240,79 @@
             chatMessagesList.forEach(msg => {
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `message ${msg.from === currentUser.id ? 'message-mine' : 'message-other'}`;
+                
+                let content = '';
+                if (msg.fileData) {
+                    if (msg.fileType.startsWith('image/')) {
+                        content = `<img src="${msg.fileData}" class="file-preview">`;
+                    } else {
+                        content = `
+                            <div class="file-message">
+                                <span class="file-icon">📎</span>
+                                <div>
+                                    <div>${msg.fileName}</div>
+                                    <div class="file-name">Нажмите для скачивания</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+                } else {
+                    content = msg.text;
+                }
+                
                 msgDiv.innerHTML = `
-                    <div>${msg.text}</div>
+                    <div>${content}</div>
                     <div class="message-time">${formatTime(msg.timestamp)}</div>
+                    ${msg.reactions ? `
+                        <div class="message-reactions">
+                            ${Object.entries(msg.reactions).map(([react, count]) => `
+                                <span class="reaction" onclick="addReaction('${msg.id}', '${react}')">
+                                    ${react} ${count}
+                                </span>
+                            `).join('')}
+                        </div>
+                    ` : ''}
                 `;
+                
                 chatMessages.appendChild(msgDiv);
             });
             
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        function addMessage(from, to, text, timestamp) {
+        function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null) {
             if (!messages[to]) messages[to] = [];
-            messages[to].push({ from, text, timestamp: timestamp || new Date().toISOString() });
+            
+            const message = {
+                id: 'msg_' + Date.now(),
+                from,
+                text,
+                timestamp: timestamp || new Date().toISOString(),
+                reactions: {}
+            };
+            
+            if (fileData) {
+                message.fileData = fileData;
+                message.fileName = fileName;
+                message.fileType = fileType;
+            }
+            
+            messages[to].push(message);
+            saveMessages();
             
             if (currentChat && currentChat.id === to) {
                 renderMessages();
+            }
+            
+            // Добавляем уведомление, если сообщение не от текущего пользователя
+            if (from !== currentUser?.id) {
+                const sender = contacts.find(c => c.id === from) || { name: from };
+                addNotification({
+                    from: sender.name || from,
+                    text: text || '📎 Файл',
+                    timestamp: message.timestamp,
+                    chatId: to
+                });
             }
         }
 
@@ -1162,7 +1322,6 @@
             contactsScreen.classList.remove('active');
             chatsScreen.classList.remove('active');
             profileScreen.classList.remove('active');
-            channelScreen.classList.remove('active');
             
             tabButtons.forEach(btn => btn.classList.remove('active'));
             
@@ -1181,10 +1340,6 @@
                 case 'profile':
                     profileScreen.classList.add('active');
                     document.querySelector('[data-tab="profile"]').classList.add('active');
-                    break;
-                case 'channel':
-                    channelScreen.classList.add('active');
-                    document.querySelector('[data-tab="channel"]').classList.add('active');
                     break;
             }
             currentTab = screenName;
@@ -1266,9 +1421,11 @@
                         break;
                         
                     case 'friend_request':
-                        showFriendRequestNotification({
-                            from: data.from,
-                            fromName: data.fromName || data.from
+                        addNotification({
+                            from: data.fromName || data.from,
+                            text: 'хочет добавить вас в друзья',
+                            timestamp: new Date().toISOString(),
+                            type: 'request'
                         });
                         break;
                         
@@ -1282,13 +1439,30 @@
                         
                     case 'message':
                         addMessage(data.from, data.from, data.text, data.timestamp);
-                        if (!currentChat || currentChat.id !== data.from) {
-                            showNotification(`Новое сообщение от ${data.fromName || data.from}`, 'info');
-                        }
+                        break;
+                        
+                    case 'file_message':
+                        addMessage(data.from, data.from, '', data.timestamp, data.fileData, data.fileName, data.fileType);
                         break;
                         
                     case 'channel_message':
-                        addChannelMessageToUI(data);
+                        if (currentUser) {
+                            addMessage('channel', 'channel', data.content, data.timestamp);
+                        }
+                        break;
+                        
+                    case 'reaction':
+                        // Обновляем реакции
+                        if (messages[data.chatId]) {
+                            const msg = messages[data.chatId].find(m => m.id === data.messageId);
+                            if (msg) {
+                                if (!msg.reactions) msg.reactions = {};
+                                msg.reactions[data.reaction] = (msg.reactions[data.reaction] || 0) + 1;
+                                if (currentChat?.id === data.chatId) {
+                                    renderMessages();
+                                }
+                            }
+                        }
                         break;
                         
                     case 'error':
@@ -1316,19 +1490,54 @@
             profileBio.textContent = currentUser.bio || 'Нет описания';
             profileAvatar.textContent = getInitials(currentUser.name || currentUser.username);
             
-            if (currentUser.id === 'admin') {
-                channelInputArea.classList.remove('hidden');
-            }
+            updateContacts();
         }
 
         function updateContacts() {
             const searchTerm = searchContacts?.value?.toLowerCase() || '';
+            
+            contactsList.innerHTML = '';
+            
+            // Добавляем канал
+            const channelEl = document.createElement('div');
+            channelEl.className = 'contact-item';
+            channelEl.innerHTML = `
+                <div class="contact-avatar" style="background: var(--primary);">📢</div>
+                <div class="contact-info">
+                    <div class="contact-name">Clock Messenger <span style="color: var(--primary);">✅</span></div>
+                    <div class="contact-status">${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров</div>
+                </div>
+            `;
+            channelEl.onclick = openChannel;
+            contactsList.appendChild(channelEl);
+            
+            // Добавляем группы
+            groups.forEach(group => {
+                if (group.name.toLowerCase().includes(searchTerm)) {
+                    const groupEl = document.createElement('div');
+                    groupEl.className = 'contact-item';
+                    groupEl.innerHTML = `
+                        <div class="contact-avatar" style="background: var(--secondary);">👥</div>
+                        <div class="contact-info">
+                            <div class="contact-name">${group.name}</div>
+                            <div class="contact-status">${group.members?.length || 1} участников</div>
+                        </div>
+                    `;
+                    groupEl.onclick = () => openChat({
+                        id: group.id,
+                        name: group.name,
+                        type: 'group'
+                    });
+                    contactsList.appendChild(groupEl);
+                }
+            });
+            
+            // Добавляем контакты
             const filtered = contacts.filter(c => 
                 (c.name || '').toLowerCase().includes(searchTerm) || 
                 (c.username || '').toLowerCase().includes(searchTerm)
             );
             
-            contactsList.innerHTML = '';
             filtered.forEach(contact => {
                 const el = document.createElement('div');
                 el.className = 'contact-item';
@@ -1344,18 +1553,7 @@
             });
             
             contactsCount.textContent = filtered.length;
-        }
-
-        function addChannelMessageToUI(msg) {
-            const el = document.createElement('div');
-            el.className = 'channel-message';
-            el.innerHTML = `
-                <div class="channel-message-author">${msg.author || 'Официальный канал'}</div>
-                <div>${msg.content}</div>
-                <div class="channel-message-time">${formatTime(msg.timestamp)}</div>
-            `;
-            channelMessagesList.appendChild(el);
-            channelMessagesList.scrollTop = channelMessagesList.scrollHeight;
+            channelsCount.textContent = 1 + groups.length;
         }
 
         // ========== ОБРАБОТЧИКИ ==========
@@ -1449,16 +1647,6 @@
             }
         });
         
-        sendChannelBtn.onclick = () => {
-            if (socket && channelInput.value) {
-                socket.send(JSON.stringify({
-                    type: 'channel_message',
-                    content: channelInput.value
-                }));
-                channelInput.value = '';
-            }
-        };
-        
         searchContacts?.addEventListener('input', updateContacts);
         
         tabButtons.forEach(btn => {
@@ -1483,6 +1671,7 @@
     </script>
 </body>
 </html>
+
 
 
 

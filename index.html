@@ -280,11 +280,19 @@
         .contact-name {
             font-weight: 600;
             margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .contact-status {
             font-size: 13px;
             color: var(--text-secondary);
+        }
+
+        .verified-badge {
+            color: var(--primary);
+            font-size: 14px;
         }
 
         /* Чат */
@@ -412,11 +420,27 @@
         .chat-header-name {
             font-weight: 600;
             font-size: 18px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .chat-header-status {
             font-size: 13px;
             color: var(--text-secondary);
+        }
+
+        .chat-header-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .chat-header-btn {
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: var(--primary);
         }
 
         /* Профиль */
@@ -564,6 +588,8 @@
             padding: 24px;
             width: 90%;
             max-width: 400px;
+            max-height: 80vh;
+            overflow-y: auto;
         }
 
         .modal-title {
@@ -605,6 +631,46 @@
             color: var(--text);
         }
 
+        /* Список контактов в модальном окне */
+        .contact-select-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            cursor: pointer;
+        }
+
+        .contact-select-item:hover {
+            background: #f0f2f5;
+        }
+
+        .contact-select-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 12px;
+        }
+
+        .contact-select-info {
+            flex: 1;
+        }
+
+        .contact-select-name {
+            font-weight: 600;
+        }
+
+        .contact-select-checkbox {
+            width: 24px;
+            height: 24px;
+            margin-left: 12px;
+        }
+
         /* Уведомления */
         .notification-container {
             position: fixed;
@@ -643,6 +709,31 @@
 
         .notification.error {
             border-left-color: var(--error);
+        }
+
+        .notification-buttons {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .notification-btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .btn-accept {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-decline {
+            background: var(--error);
+            color: white;
         }
 
         .hidden {
@@ -824,6 +915,9 @@
                         <div class="chat-header-name" id="chatName">Выберите чат</div>
                         <div class="chat-header-status" id="chatStatus"></div>
                     </div>
+                    <div class="chat-header-actions">
+                        <button class="chat-header-btn" id="addToGroupBtn" style="display: none;">👥+</button>
+                    </div>
                 </div>
                 <div id="chatMessages" class="chat-messages"></div>
                 <div class="chat-input-area">
@@ -891,6 +985,18 @@
         </div>
     </div>
 
+    <div id="addToGroupModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Добавить участников</div>
+            <input type="text" id="searchContactsForGroup" class="modal-input" placeholder="Поиск...">
+            <div id="contactsForGroupList" style="max-height: 300px; overflow-y: auto; margin-bottom: 16px;"></div>
+            <div class="modal-buttons">
+                <button id="addToGroupCancel" class="modal-button modal-button-secondary">Отмена</button>
+                <button id="addToGroupConfirm" class="modal-button modal-button-primary">Добавить</button>
+            </div>
+        </div>
+    </div>
+
     <div id="editProfileModal" class="modal">
         <div class="modal-content">
             <div class="modal-title">Редактировать профиль</div>
@@ -923,6 +1029,7 @@
             subscribers: 1,
             views: 0
         };
+        let selectedContactsForGroup = [];
 
         // ========== DOM ЭЛЕМЕНТЫ ==========
         const statusEl = document.getElementById('statusDisplay');
@@ -968,6 +1075,7 @@
         const attachFileBtn = document.getElementById('attachFileBtn');
         const chatName = document.getElementById('chatName');
         const chatStatus = document.getElementById('chatStatus');
+        const addToGroupBtn = document.getElementById('addToGroupBtn');
         
         // Профиль
         const profileAvatar = document.getElementById('profileAvatar');
@@ -989,6 +1097,12 @@
         const groupDescription = document.getElementById('groupDescription');
         const createGroupConfirm = document.getElementById('createGroupConfirm');
         const createGroupCancel = document.getElementById('createGroupCancel');
+        
+        const addToGroupModal = document.getElementById('addToGroupModal');
+        const searchContactsForGroup = document.getElementById('searchContactsForGroup');
+        const contactsForGroupList = document.getElementById('contactsForGroupList');
+        const addToGroupConfirm = document.getElementById('addToGroupConfirm');
+        const addToGroupCancel = document.getElementById('addToGroupCancel');
         
         const editProfileModal = document.getElementById('editProfileModal');
         const editName = document.getElementById('editName');
@@ -1038,7 +1152,6 @@
             localStorage.setItem('notifications', JSON.stringify(notifications));
             updateNotificationBell();
             
-            // Показываем всплывающее уведомление
             showNotification(notification.text, 'info');
         }
 
@@ -1073,7 +1186,7 @@
             } else {
                 notifications.forEach(notif => {
                     html += `
-                        <div class="notification-item" onclick="window.location.href='#${notif.chatId}'">
+                        <div class="notification-item" onclick="openChatFromNotification('${notif.chatId}')">
                             <div class="notification-avatar">${getInitials(notif.from)}</div>
                             <div class="notification-content">
                                 <div class="notification-title">${notif.from}</div>
@@ -1087,6 +1200,70 @@
             
             notificationPopup.innerHTML = html;
             document.body.appendChild(notificationPopup);
+        };
+
+        function openChatFromNotification(chatId) {
+            const contact = contacts.find(c => c.id === chatId) || 
+                           groups.find(g => g.id === chatId) || 
+                           { id: chatId, name: chatId };
+            openChat(contact);
+            if (notificationPopup) {
+                notificationPopup.remove();
+                notificationPopup = null;
+            }
+        }
+
+        // ========== ОБРАБОТКА ЗАЯВОК В ДРУЗЬЯ ==========
+        function showFriendRequestNotification(request) {
+            pendingRequests.push(request);
+            
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = 'notification';
+            notification.innerHTML = `
+                <div style="margin-bottom: 8px;">${request.fromName} хочет добавить вас в друзья</div>
+                <div class="notification-buttons">
+                    <button class="notification-btn btn-accept" onclick="acceptRequest('${request.from}')">✓ Принять</button>
+                    <button class="notification-btn btn-decline" onclick="declineRequest('${request.from}')">✗ Отклонить</button>
+                </div>
+            `;
+            container.appendChild(notification);
+            
+            updateNotificationBell();
+            
+            setTimeout(() => notification.remove(), 10000);
+        }
+
+        window.acceptRequest = function(requesterId) {
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'accept_friend',
+                    requesterId: requesterId
+                }));
+                
+                pendingRequests = pendingRequests.filter(r => r.from !== requesterId);
+                updateNotificationBell();
+                
+                showNotification('Вы приняли заявку', 'success');
+                
+                document.querySelectorAll('.notification').forEach(n => n.remove());
+            }
+        };
+
+        window.declineRequest = function(requesterId) {
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'decline_friend',
+                    requesterId: requesterId
+                }));
+                
+                pendingRequests = pendingRequests.filter(r => r.from !== requesterId);
+                updateNotificationBell();
+                
+                showNotification('Заявка отклонена', 'info');
+                
+                document.querySelectorAll('.notification').forEach(n => n.remove());
+            }
         };
 
         // ========== ЗАГРУЗКА ФАЙЛОВ ==========
@@ -1147,33 +1324,110 @@
                 return;
             }
             
-            const groupId = 'group_' + Date.now();
-            const group = {
-                id: groupId,
-                name: name,
-                description: desc,
-                members: [currentUser.id],
-                createdBy: currentUser.id,
-                createdAt: new Date().toISOString()
-            };
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'create_group',
+                    groupName: name,
+                    groupDescription: desc
+                }));
+                
+                const groupId = 'group_' + Date.now();
+                const group = {
+                    id: groupId,
+                    name: name,
+                    description: desc,
+                    members: [currentUser.id],
+                    createdBy: currentUser.id,
+                    createdAt: new Date().toISOString()
+                };
+                
+                groups.push(group);
+                localStorage.setItem('groups', JSON.stringify(groups));
+                
+                updateContacts();
+                
+                showNotification('Группа создана', 'success');
+            }
             
-            groups.push(group);
-            localStorage.setItem('groups', JSON.stringify(groups));
-            
-            contacts.push({
-                id: groupId,
-                name: name,
-                username: groupId,
-                type: 'group',
-                members: 1
-            });
-            
-            updateContacts();
             createGroupModal.classList.remove('active');
             groupName.value = '';
             groupDescription.value = '';
+        };
+
+        // ========== ДОБАВЛЕНИЕ В ГРУППУ ==========
+        function showAddToGroupModal() {
+            if (!currentChat || !currentChat.id.startsWith('group_')) return;
             
-            showNotification('Группа создана', 'success');
+            selectedContactsForGroup = [];
+            renderContactsForGroup();
+            addToGroupModal.classList.add('active');
+        }
+
+        function renderContactsForGroup() {
+            const searchTerm = searchContactsForGroup?.value?.toLowerCase() || '';
+            const filtered = contacts.filter(c => 
+                (c.name || '').toLowerCase().includes(searchTerm) || 
+                (c.username || '').toLowerCase().includes(searchTerm)
+            );
+            
+            contactsForGroupList.innerHTML = '';
+            
+            filtered.forEach(contact => {
+                const isSelected = selectedContactsForGroup.includes(contact.id);
+                const div = document.createElement('div');
+                div.className = 'contact-select-item';
+                div.onclick = () => toggleContactSelection(contact.id);
+                div.innerHTML = `
+                    <div class="contact-select-avatar">${getInitials(contact.name || contact.username)}</div>
+                    <div class="contact-select-info">
+                        <div class="contact-select-name">${contact.name || contact.username}</div>
+                    </div>
+                    <input type="checkbox" class="contact-select-checkbox" ${isSelected ? 'checked' : ''}>
+                `;
+                contactsForGroupList.appendChild(div);
+            });
+        }
+
+        function toggleContactSelection(contactId) {
+            const index = selectedContactsForGroup.indexOf(contactId);
+            if (index === -1) {
+                selectedContactsForGroup.push(contactId);
+            } else {
+                selectedContactsForGroup.splice(index, 1);
+            }
+            renderContactsForGroup();
+        }
+
+        addToGroupBtn.onclick = showAddToGroupModal;
+
+        searchContactsForGroup.addEventListener('input', renderContactsForGroup);
+
+        addToGroupCancel.onclick = () => {
+            addToGroupModal.classList.remove('active');
+            selectedContactsForGroup = [];
+        };
+
+        addToGroupConfirm.onclick = () => {
+            if (socket && currentChat && selectedContactsForGroup.length > 0) {
+                socket.send(JSON.stringify({
+                    type: 'add_to_group',
+                    groupId: currentChat.id,
+                    members: selectedContactsForGroup
+                }));
+                
+                // Обновляем локально
+                const group = groups.find(g => g.id === currentChat.id);
+                if (group) {
+                    if (!group.members) group.members = [];
+                    group.members = [...new Set([...group.members, ...selectedContactsForGroup])];
+                    localStorage.setItem('groups', JSON.stringify(groups));
+                }
+                
+                showNotification('Участники добавлены', 'success');
+            }
+            
+            addToGroupModal.classList.remove('active');
+            selectedContactsForGroup = [];
         };
 
         // ========== КАНАЛ ==========
@@ -1185,7 +1439,7 @@
                 verified: true
             };
             
-            chatName.innerHTML = 'Clock Messenger <span style="color: var(--primary);">✅</span>';
+            chatName.innerHTML = 'Clock Messenger <span class="verified-badge">✅</span>';
             chatStatus.innerHTML = `${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров`;
             
             if (!messages['channel']) {
@@ -1194,15 +1448,19 @@
             
             renderMessages();
             
-            // Увеличиваем счётчик просмотров
             channelStats.views++;
             
             chatInput.disabled = true;
             sendMessageBtn.disabled = true;
+            addToGroupBtn.style.display = 'none';
             
             if (currentUser && currentUser.id === 'admin') {
                 chatInput.disabled = false;
                 sendMessageBtn.disabled = false;
+            }
+            
+            if (socket) {
+                socket.send(JSON.stringify({ type: 'channel_view' }));
             }
             
             showScreen('chats');
@@ -1228,6 +1486,12 @@
             chatInput.disabled = false;
             sendMessageBtn.disabled = false;
             
+            if (contact.id.startsWith('group_')) {
+                addToGroupBtn.style.display = 'block';
+            } else {
+                addToGroupBtn.style.display = 'none';
+            }
+            
             showScreen('chats');
         }
 
@@ -1243,14 +1507,14 @@
                 
                 let content = '';
                 if (msg.fileData) {
-                    if (msg.fileType.startsWith('image/')) {
-                        content = `<img src="${msg.fileData}" class="file-preview">`;
+                    if (msg.fileType?.startsWith('image/')) {
+                        content = `<img src="${msg.fileData}" class="file-preview" onclick="window.open('${msg.fileData}')">`;
                     } else {
                         content = `
-                            <div class="file-message">
+                            <div class="file-message" onclick="window.open('${msg.fileData}')">
                                 <span class="file-icon">📎</span>
                                 <div>
-                                    <div>${msg.fileName}</div>
+                                    <div>${msg.fileName || 'Файл'}</div>
                                     <div class="file-name">Нажмите для скачивания</div>
                                 </div>
                             </div>
@@ -1260,18 +1524,19 @@
                     content = msg.text;
                 }
                 
+                let reactionsHtml = '';
+                if (msg.reactions && Object.keys(msg.reactions).length > 0) {
+                    reactionsHtml = '<div class="message-reactions">';
+                    for (const [react, count] of Object.entries(msg.reactions)) {
+                        reactionsHtml += `<span class="reaction" onclick="addReaction('${msg.id}', '${react}')">${react} ${count}</span>`;
+                    }
+                    reactionsHtml += '</div>';
+                }
+                
                 msgDiv.innerHTML = `
                     <div>${content}</div>
                     <div class="message-time">${formatTime(msg.timestamp)}</div>
-                    ${msg.reactions ? `
-                        <div class="message-reactions">
-                            ${Object.entries(msg.reactions).map(([react, count]) => `
-                                <span class="reaction" onclick="addReaction('${msg.id}', '${react}')">
-                                    ${react} ${count}
-                                </span>
-                            `).join('')}
-                        </div>
-                    ` : ''}
+                    ${reactionsHtml}
                 `;
                 
                 chatMessages.appendChild(msgDiv);
@@ -1284,7 +1549,7 @@
             if (!messages[to]) messages[to] = [];
             
             const message = {
-                id: 'msg_' + Date.now(),
+                id: 'msg_' + Date.now() + Math.random(),
                 from,
                 text,
                 timestamp: timestamp || new Date().toISOString(),
@@ -1300,11 +1565,10 @@
             messages[to].push(message);
             saveMessages();
             
-            if (currentChat && currentChat.id === to) {
+            if (currentChat && (currentChat.id === to || (currentChat.id === 'channel' && to === 'channel'))) {
                 renderMessages();
             }
             
-            // Добавляем уведомление, если сообщение не от текущего пользователя
             if (from !== currentUser?.id) {
                 const sender = contacts.find(c => c.id === from) || { name: from };
                 addNotification({
@@ -1421,11 +1685,9 @@
                         break;
                         
                     case 'friend_request':
-                        addNotification({
-                            from: data.fromName || data.from,
-                            text: 'хочет добавить вас в друзья',
-                            timestamp: new Date().toISOString(),
-                            type: 'request'
+                        showFriendRequestNotification({
+                            from: data.from,
+                            fromName: data.fromName || data.from
                         });
                         break;
                         
@@ -1447,21 +1709,17 @@
                         
                     case 'channel_message':
                         if (currentUser) {
-                            addMessage('channel', 'channel', data.content, data.timestamp);
+                            addMessage('channel', 'channel', data.content, data.timestamp, data.fileData, data.fileName, data.fileType);
                         }
                         break;
                         
-                    case 'reaction':
-                        // Обновляем реакции
-                        if (messages[data.chatId]) {
-                            const msg = messages[data.chatId].find(m => m.id === data.messageId);
-                            if (msg) {
-                                if (!msg.reactions) msg.reactions = {};
-                                msg.reactions[data.reaction] = (msg.reactions[data.reaction] || 0) + 1;
-                                if (currentChat?.id === data.chatId) {
-                                    renderMessages();
-                                }
-                            }
+                    case 'channel_stats':
+                        channelStats = {
+                            subscribers: data.subscribers,
+                            views: data.views
+                        };
+                        if (currentChat && currentChat.id === 'channel') {
+                            chatStatus.innerHTML = `${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров`;
                         }
                         break;
                         
@@ -1504,7 +1762,7 @@
             channelEl.innerHTML = `
                 <div class="contact-avatar" style="background: var(--primary);">📢</div>
                 <div class="contact-info">
-                    <div class="contact-name">Clock Messenger <span style="color: var(--primary);">✅</span></div>
+                    <div class="contact-name">Clock Messenger <span class="verified-badge">✅</span></div>
                     <div class="contact-status">${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров</div>
                 </div>
             `;
@@ -1523,11 +1781,7 @@
                             <div class="contact-status">${group.members?.length || 1} участников</div>
                         </div>
                     `;
-                    groupEl.onclick = () => openChat({
-                        id: group.id,
-                        name: group.name,
-                        type: 'group'
-                    });
+                    groupEl.onclick = () => openChat(group);
                     contactsList.appendChild(groupEl);
                 }
             });
@@ -1661,6 +1915,13 @@
             }
         });
 
+        // Запрос статистики канала
+        setInterval(() => {
+            if (socket && currentUser) {
+                socket.send(JSON.stringify({ type: 'get_channel_stats' }));
+            }
+        }, 30000);
+
         // ========== ИНИЦИАЛИЗАЦИЯ ==========
         if (token) {
             connectWebSocket();
@@ -1671,6 +1932,7 @@
     </script>
 </body>
 </html>
+
 
 
 

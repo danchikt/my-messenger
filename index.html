@@ -1028,19 +1028,28 @@
             }
         }
 
-        notificationBell.onclick = () => {
+        // Исправленный обработчик для колокольчика
+        notificationBell.onclick = (e) => {
+            e.stopPropagation(); // Чтобы событие не уходило дальше
+            
+            // Если попап уже открыт — закрываем его
             if (notificationPopup) {
                 notificationPopup.remove();
                 notificationPopup = null;
+                return;
             }
             
+            // Создаём новый попап
             notificationPopup = document.createElement('div');
             notificationPopup.className = 'requests-popup';
             
-            let html = '<h3 style="margin-bottom: 12px;">Заявки в друзья</h3>';
+            let html = '<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">';
+            html += '<h3 style="font-size: 16px;">Заявки в друзья</h3>';
+            html += '<span style="cursor: pointer; font-size: 18px;" onclick="this.parentElement.parentElement.remove(); notificationPopup = null;">✕</span>';
+            html += '</div>';
             
             if (pendingRequests.length === 0) {
-                html += '<p style="color: var(--text-secondary); text-align: center;">Нет новых заявок</p>';
+                html += '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">Нет новых заявок</p>';
             } else {
                 pendingRequests.forEach(req => {
                     html += `
@@ -1061,14 +1070,6 @@
             
             notificationPopup.innerHTML = html;
             document.body.appendChild(notificationPopup);
-            
-            // Закрыть при клике вне попапа
-            setTimeout(() => {
-                if (notificationPopup) {
-                    notificationPopup.remove();
-                    notificationPopup = null;
-                }
-            }, 10000);
         };
 
         window.acceptRequest = function(requesterId) {
@@ -1482,6 +1483,7 @@
     </script>
 </body>
 </html>
+
 
 
 

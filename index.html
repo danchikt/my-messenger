@@ -519,6 +519,143 @@
         .hidden {
             display: none;
         }
+
+        /* Колокольчик уведомлений */
+        .notification-bell {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 100;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        .bell-count {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: var(--error);
+            color: white;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .notification-popup {
+            position: fixed;
+            top: 120px;
+            right: 20px;
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            z-index: 101;
+            min-width: 250px;
+            max-width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification-item {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .notification-item:last-child {
+            border-bottom: none;
+        }
+
+        .notification-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+
+        .notification-content {
+            flex: 1;
+        }
+
+        .notification-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 14px;
+        }
+
+        .notification-text {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .notification-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+        }
+
+        .notification-btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .notification-btn:hover {
+            opacity: 0.8;
+        }
+
+        .btn-accept {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-decline {
+            background: var(--error);
+            color: white;
+        }
     </style>
 </head>
 <body>
@@ -533,6 +670,12 @@
                     <span id="userName"></span>
                 </div>
             </div>
+        </div>
+
+        <!-- Колокольчик уведомлений -->
+        <div class="notification-bell" id="notificationBell" style="display: none;">
+            <span class="bell-icon">🔔</span>
+            <span class="bell-count" id="notificationCount">0</span>
         </div>
 
         <!-- Основной контент -->
@@ -669,6 +812,7 @@
         let channelMessages = [];
         let socket = null;
         let currentTab = 'contacts';
+        let pendingRequests = [];
 
         // ========== DOM ЭЛЕМЕНТЫ ==========
         const statusEl = document.getElementById('statusDisplay');
@@ -735,6 +879,11 @@
         const editProfileConfirm = document.getElementById('editProfileConfirm');
         const editProfileCancel = document.getElementById('editProfileCancel');
 
+        // Элементы уведомлений
+        const notificationBell = document.getElementById('notificationBell');
+        const notificationCount = document.getElementById('notificationCount');
+        let notificationPopup = null;
+
         // ========== УТИЛИТЫ ==========
         function showNotification(message, type = 'info') {
             const container = document.getElementById('notificationContainer');
@@ -759,6 +908,118 @@
             const date = new Date(timestamp);
             return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
         }
+
+        // ========== СИСТЕМА УВЕДОМЛЕНИЙ ==========
+        function showFriendRequestNotification(request) {
+            pendingRequests.push(request);
+            updateNotificationBell();
+            
+            if (notificationPopup) {
+                notificationPopup.remove();
+            }
+            
+            notificationPopup = document.createElement('div');
+            notificationPopup.className = 'notification-popup';
+            notificationPopup.innerHTML = `
+                <div class="notification-item">
+                    <div class="notification-avatar">${getInitials(request.fromName)}</div>
+                    <div class="notification-content">
+                        <div class="notification-title">${request.fromName}</div>
+                        <div class="notification-text">хочет добавить вас в друзья</div>
+                        <div class="notification-actions">
+                            <button class="notification-btn btn-accept" onclick="acceptRequest('${request.from}')">✓ Принять</button>
+                            <button class="notification-btn btn-decline" onclick="declineRequest('${request.from}')">✗ Отклонить</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(notificationPopup);
+            
+            setTimeout(() => {
+                if (notificationPopup) {
+                    notificationPopup.remove();
+                    notificationPopup = null;
+                }
+            }, 10000);
+        }
+
+        function updateNotificationBell() {
+            if (pendingRequests.length > 0) {
+                notificationBell.style.display = 'flex';
+                notificationCount.textContent = pendingRequests.length;
+            } else {
+                notificationBell.style.display = 'none';
+            }
+        }
+
+        notificationBell.onclick = () => {
+            if (notificationPopup) {
+                notificationPopup.remove();
+            }
+            
+            notificationPopup = document.createElement('div');
+            notificationPopup.className = 'notification-popup';
+            notificationPopup.style.maxHeight = '400px';
+            notificationPopup.style.overflowY = 'auto';
+            
+            let html = '';
+            pendingRequests.forEach(req => {
+                html += `
+                    <div class="notification-item">
+                        <div class="notification-avatar">${getInitials(req.fromName)}</div>
+                        <div class="notification-content">
+                            <div class="notification-title">${req.fromName}</div>
+                            <div class="notification-text">хочет добавить вас в друзья</div>
+                            <div class="notification-actions">
+                                <button class="notification-btn btn-accept" onclick="acceptRequest('${req.from}')">✓ Принять</button>
+                                <button class="notification-btn btn-decline" onclick="declineRequest('${req.from}')">✗ Отклонить</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            notificationPopup.innerHTML = html;
+            document.body.appendChild(notificationPopup);
+        };
+
+        window.acceptRequest = function(requesterId) {
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'accept_friend',
+                    requesterId: requesterId
+                }));
+                
+                pendingRequests = pendingRequests.filter(r => r.from !== requesterId);
+                updateNotificationBell();
+                
+                if (notificationPopup) {
+                    notificationPopup.remove();
+                    notificationPopup = null;
+                }
+                
+                showNotification('Вы приняли заявку', 'success');
+            }
+        };
+
+        window.declineRequest = function(requesterId) {
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'decline_friend',
+                    requesterId: requesterId
+                }));
+                
+                pendingRequests = pendingRequests.filter(r => r.from !== requesterId);
+                updateNotificationBell();
+                
+                if (notificationPopup) {
+                    notificationPopup.remove();
+                    notificationPopup = null;
+                }
+                
+                showNotification('Заявка отклонена', 'info');
+            }
+        };
 
         // ========== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ==========
         function showScreen(screenName) {
@@ -843,7 +1104,7 @@
 
         // ========== WEB SOCKET ==========
         function connectWebSocket() {
-            const wsUrl = 'wss://my-messenger-xiic.onrender.com';
+            const wsUrl = 'wss://' + window.location.host;
             socket = new WebSocket(wsUrl);
             
             socket.onopen = () => {
@@ -870,11 +1131,18 @@
                         break;
                         
                     case 'friend_request':
-                        showNotification(`Новая заявка от ${data.fromName}`, 'info');
+                        showFriendRequestNotification({
+                            from: data.from,
+                            fromName: data.fromName || data.from
+                        });
                         break;
                         
                     case 'friend_request_sent':
                         showNotification(`Запрос отправлен ${data.to}`, 'success');
+                        break;
+                        
+                    case 'friend_request_accepted':
+                        showNotification(data.message, 'success');
                         break;
                         
                     case 'channel_message':
@@ -901,13 +1169,11 @@
             userName.textContent = currentUser.name || currentUser.username;
             userAvatar.textContent = getInitials(currentUser.name || currentUser.username);
             
-            // Профиль
             profileName.textContent = currentUser.name || currentUser.username;
             profileUsername.textContent = '@' + currentUser.username;
             profileBio.textContent = currentUser.bio || 'Нет описания';
             profileAvatar.textContent = getInitials(currentUser.name || currentUser.username);
             
-            // Канал (показываем инпут только админу)
             if (currentUser.id === 'admin') {
                 channelInputArea.classList.remove('hidden');
             }
@@ -948,6 +1214,11 @@
             `;
             channelMessagesList.appendChild(el);
             channelMessagesList.scrollTop = channelMessagesList.scrollHeight;
+        }
+
+        function openChat(contact) {
+            showScreen('chats');
+            // Здесь будет логика открытия чата
         }
 
         // ========== ОБРАБОТЧИКИ ==========
@@ -992,6 +1263,7 @@
                 }));
                 addFriendModal.classList.remove('active');
                 addFriendInput.value = '';
+                showNotification('Запрос отправлен', 'success');
             }
         };
         
@@ -1015,6 +1287,7 @@
                 updateUIForUser();
             }
             editProfileModal.classList.remove('active');
+            showNotification('Профиль обновлен', 'success');
         };
         
         sendChannelBtn.onclick = () => {

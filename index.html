@@ -1576,12 +1576,12 @@
                 if (group && group.members) {
                     group.members = group.members.filter(id => id !== memberId);
                     saveGroups();
-                    showGroupMembers();
-                    if (currentChat && currentChat.id === currentChat.id) {
+                    if (currentChat && currentChat.id === group.id) {
                         chatStatus.textContent = `${group.members.length} участников`;
                     }
                 }
                 
+                showGroupMembers();
                 showNotification('Участник исключен', 'success');
             });
         }
@@ -1872,6 +1872,7 @@
             socket = new WebSocket(wsUrl);
             
             socket.onopen = () => {
+                console.log('WebSocket открыт');
                 statusEl.className = 'status-connected';
                 statusEl.innerHTML = '🟢 Подключено';
                 if (token) {
@@ -1885,6 +1886,7 @@
                 
                 switch(data.type) {
                     case 'auth_success':
+                        console.log('✅ Авторизация успешна');
                         currentUser = { ...currentUser, ...data.user };
                         contacts = data.contacts || [];
                         updateContacts();
@@ -2032,6 +2034,7 @@
             };
             
             socket.onclose = () => {
+                console.log('WebSocket закрыт');
                 statusEl.className = 'status-disconnected';
                 statusEl.innerHTML = '🔴 Не подключено';
                 setTimeout(connectWebSocket, 3000);
@@ -2297,6 +2300,7 @@
     </script>
 </body>
 </html>
+
 
 
 

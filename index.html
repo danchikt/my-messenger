@@ -3313,26 +3313,42 @@
                         
                     case 'group_created':
                         if (data.group) {
+                            // Добавляем группу для всех участников
                             groups.push(data.group);
                             saveGroups();
-                            updateContacts();
-                            showNotification(`Группа "${data.group.name}" создана`, 'success');
+                            
+                            // Если текущий пользователь является участником группы, показываем её
+                            if (data.group.members.includes(currentUser?.id)) {
+                                updateContacts();
+                                showNotification(`Группа "${data.group.name}" создана`, 'success');
+                            }
                         }
                         break;
                         
                     case 'group_members_added':
-                        if (data.groupId) {
+                        if (data.groupId && data.members) {
                             const group = groups.find(g => g.id === data.groupId);
-                            if (group && data.members) {
+                            if (group) {
                                 if (!group.members) group.members = [];
-                                group.members = [...new Set([...group.members, ...data.members])];
+                                // Добавляем новых участников
+                                data.members.forEach(memberId => {
+                                    if (!group.members.includes(memberId)) {
+                                        group.members.push(memberId);
+                                    }
+                                });
                                 saveGroups();
+                                
+                                // Если текущий пользователь был добавлен, показываем группу
+                                if (data.members.includes(currentUser?.id) && !contacts.some(c => c.id === group.id)) {
+                                    updateContacts();
+                                    showNotification(`Вас добавили в группу "${group.name}"`, 'info');
+                                }
+                                
                                 if (currentChat && currentChat.id === data.groupId) {
                                     chatStatus.textContent = `${group.members.length} участников`;
                                 }
                             }
                         }
-                        showNotification('Новые участники добавлены', 'success');
                         break;
                         
                     case 'member_kicked':
@@ -3522,6 +3538,25 @@
             channelEl.onclick = openChannel;
             contactsList.appendChild(channelEl);
             
+            // Группы - показываем только те, в которых состоит пользователь
+            const userGroups = groups.filter(group => group.members?.includes(currentUser.id));
+            
+            userGroups.forEach(group => {
+                if (group.name.toLowerCase().includes(searchTerm)) {
+                    const groupEl = document.createElement('div');
+                    groupEl.className = 'contact-item';
+                    groupEl.innerHTML = `
+                        <div class="contact-avatar" style="background: var(--secondary);">👥</div>
+                        <div class="contact-info">
+                            <div class="contact-name">${group.name} <span class="group-badge">группа</span></div>
+                            <div class="contact-status">${group.members?.length || 1} участников</div>
+                        </div>
+                    `;
+                    groupEl.onclick = () => openChat(group);
+                    contactsList.appendChild(groupEl);
+                }
+            });
+            
             // Закреплённые контакты
             const pinned = contacts.filter(c => pinnedContacts.includes(c.id));
             if (pinned.length > 0) {
@@ -3547,23 +3582,6 @@
                 
                 contactsList.appendChild(pinnedSection);
             }
-            
-            // Группы
-            groups.forEach(group => {
-                if (group.name.toLowerCase().includes(searchTerm)) {
-                    const groupEl = document.createElement('div');
-                    groupEl.className = 'contact-item';
-                    groupEl.innerHTML = `
-                        <div class="contact-avatar" style="background: var(--secondary);">👥</div>
-                        <div class="contact-info">
-                            <div class="contact-name">${group.name} <span class="group-badge">группа</span></div>
-                            <div class="contact-status">${group.members?.length || 1} участников</div>
-                        </div>
-                    `;
-                    groupEl.onclick = () => openChat(group);
-                    contactsList.appendChild(groupEl);
-                }
-            });
             
             // Обычные контакты
             const regular = contacts.filter(c => !pinnedContacts.includes(c.id));
@@ -3671,14 +3689,19 @@
                     createdAt: new Date().toISOString()
                 };
                 
+                // Отправляем на сервер
                 socket.send(JSON.stringify({
                     type: 'create_group',
                     group: newGroup
                 }));
                 
+                // Добавляем группу локально
                 groups.push(newGroup);
                 saveGroups();
                 updateContacts();
+                
+                // Открываем созданную группу
+                openChat(newGroup);
                 
                 createGroupModal.classList.remove('active');
                 groupName.value = '';
@@ -3704,8 +3727,16 @@
                 const group = groups.find(g => g.id === currentChat.id);
                 if (group) {
                     if (!group.members) group.members = [];
-                    group.members = [...new Set([...group.members, ...selectedContactsForGroup])];
+                    
+                    // Добавляем участников локально для отображения
+                    selectedContactsForGroup.forEach(memberId => {
+                        if (!group.members.includes(memberId)) {
+                            group.members.push(memberId);
+                        }
+                    });
+                    
                     saveGroups();
+                    
                     if (currentChat && currentChat.id === group.id) {
                         chatStatus.textContent = `${group.members.length} участников`;
                     }
@@ -3848,6 +3879,7 @@
     </script>
 </body>
 </html>
+
 
 
 

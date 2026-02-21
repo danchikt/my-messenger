@@ -640,21 +640,26 @@ wss.on('connection', (ws) => {
                     break;
 
                 case 'reaction':
-                    // Рассылаем реакцию всем в чате
-                    const { chatId, messageId, reaction } = data;
+                    if (!currentUser) break;
                     
+                    const reactionData = data;
+                    
+                    // Рассылаем реакцию всем в чате
                     clients.forEach((client, userId) => {
                         if (client && client.readyState === WebSocket.OPEN) {
                             client.send(JSON.stringify({
                                 type: 'reaction',
-                                chatId: chatId,
-                                messageId: messageId,
-                                reaction: reaction,
-                                userId: currentUser?.userId
+                                chatId: reactionData.chatId,
+                                messageId: reactionData.messageId,
+                                reaction: reactionData.reaction,
+                                userId: currentUser.userId
                             }));
                         }
                     });
                     break;
+                    
+                default:
+                    console.log('❓ Неизвестный тип сообщения:', data.type);
             }
         } catch (e) {
             console.log('❌ Ошибка:', e);

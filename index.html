@@ -340,6 +340,13 @@
             border-radius: 18px;
             position: relative;
             word-wrap: break-word;
+            transition: transform 0.2s;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .message:active {
+            transform: scale(0.98);
         }
 
         .message-mine {
@@ -373,15 +380,80 @@
         .message-reactions {
             display: flex;
             gap: 4px;
-            margin-top: 4px;
-            font-size: 12px;
+            margin-top: 8px;
+            flex-wrap: wrap;
         }
 
         .reaction {
             background: rgba(0,0,0,0.05);
-            padding: 2px 6px;
-            border-radius: 12px;
+            padding: 4px 8px;
+            border-radius: 20px;
+            font-size: 13px;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .reaction:hover {
+            background: rgba(0,0,0,0.1);
+        }
+
+        .reaction.selected {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary-dark);
+        }
+
+        .reaction-picker {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface);
+            border-radius: 40px;
+            padding: 12px 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            display: none;
+            gap: 16px;
+            z-index: 1000;
+            animation: slideUp 0.2s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translate(-50%, 100%);
+                opacity: 0;
+            }
+            to {
+                transform: translate(-50%, 0);
+                opacity: 1;
+            }
+        }
+
+        .reaction-picker.active {
+            display: flex;
+        }
+
+        .reaction-option {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 24px;
+            transition: transform 0.2s;
+        }
+
+        .reaction-option:hover {
+            transform: scale(1.2);
+            background: var(--primary);
+            color: white;
         }
 
         .chat-input-area {
@@ -1044,6 +1116,16 @@
         </div>
     </div>
 
+    <!-- Панель выбора реакций -->
+    <div id="reactionPicker" class="reaction-picker">
+        <span class="reaction-option" onclick="addReactionToSelected('👍')">👍</span>
+        <span class="reaction-option" onclick="addReactionToSelected('❤️')">❤️</span>
+        <span class="reaction-option" onclick="addReactionToSelected('😮')">😮</span>
+        <span class="reaction-option" onclick="addReactionToSelected('😢')">😢</span>
+        <span class="reaction-option" onclick="addReactionToSelected('😡')">😡</span>
+        <span class="reaction-option" onclick="addReactionToSelected('🎉')">🎉</span>
+    </div>
+
     <div id="addFriendModal" class="modal">
         <div class="modal-content">
             <div class="modal-title">Добавить друга</div>
@@ -1118,8 +1200,8 @@
     <script>
         // ========== СОСТОЯНИЕ ==========
         let token = localStorage.getItem('token');
-        let currentUser = null;
-        let contacts = [];
+        let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+        let contacts = JSON.parse(localStorage.getItem('contacts')) || [];
         let messages = JSON.parse(localStorage.getItem('messages')) || {};
         let currentChat = null;
         let groups = JSON.parse(localStorage.getItem('groups')) || [];
@@ -1130,6 +1212,7 @@
         let channelStats = { subscribers: 1, views: 0 };
         let blockedUsers = JSON.parse(localStorage.getItem('blockedUsers')) || [];
         let selectedContactsForGroup = [];
+        let selectedMessageId = null;
 
         // ========== DOM ЭЛЕМЕНТЫ ==========
         const statusEl = document.getElementById('statusDisplay');
@@ -1220,6 +1303,7 @@
         
         const notificationBell = document.getElementById('notificationBell');
         const notificationCount = document.getElementById('notificationCount');
+        const reactionPicker = document.getElementById('reactionPicker');
         let notificationPopup = null;
 
         // ========== УТИЛИТЫ ==========
@@ -1255,6 +1339,16 @@
             localStorage.setItem('groups', JSON.stringify(groups));
         }
 
+        function saveContacts() {
+            localStorage.setItem('contacts', JSON.stringify(contacts));
+        }
+
+        function saveCurrentUser() {
+            if (currentUser) {
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+            }
+        }
+
         function showConfirm(title, message, onConfirm) {
             confirmTitle.textContent = title;
             confirmMessage.textContent = message;
@@ -1282,6 +1376,7 @@
                 currentUser = null;
                 token = null;
                 localStorage.removeItem('token');
+                localStorage.removeItem('currentUser');
                 
                 contacts = [];
                 groups = [];
@@ -1297,6 +1392,74 @@
         }
 
         logoutBtn.onclick = logout;
+
+        // ========== РЕАКЦИИ ==========
+        function showReactionPicker(messageId, x, y) {
+            selectedMessageId = messageId;
+            reactionPicker.classList.add('active');
+            
+            // Позиционируем рядом с сообщением
+            reactionPicker.style.left = x + 'px';
+            reactionPicker.style.top = (y - 60) + 'px';
+            
+            // Закрываем при клике вне
+            setTimeout(() => {
+                document.addEventListener('click', closeReactionPicker);
+            }, 100);
+        }
+
+        function closeReactionPicker(e) {
+            if (!reactionPicker.contains(e.target)) {
+                reactionPicker.classList.remove('active');
+                document.removeEventListener('click', closeReactionPicker);
+            }
+        }
+
+        function addReactionToSelected(reaction) {
+            if (selectedMessageId && currentChat && socket) {
+                // Отправляем реакцию на сервер
+                socket.send(JSON.stringify({
+                    type: 'reaction',
+                    chatId: currentChat.id,
+                    messageId: selectedMessageId,
+                    reaction: reaction,
+                    remove: false
+                }));
+                
+                // Добавляем реакцию локально
+                const chatMessagesList = messages[currentChat.id] || [];
+                const message = chatMessagesList.find(m => m.id === selectedMessageId);
+                if (message) {
+                    if (!message.reactions) message.reactions = {};
+                    message.reactions[reaction] = (message.reactions[reaction] || 0) + 1;
+                    renderMessages();
+                }
+                
+                reactionPicker.classList.remove('active');
+            }
+        }
+
+        function removeReaction(messageId, reaction) {
+            if (currentChat && socket) {
+                socket.send(JSON.stringify({
+                    type: 'reaction',
+                    chatId: currentChat.id,
+                    messageId: messageId,
+                    reaction: reaction,
+                    remove: true
+                }));
+                
+                const chatMessagesList = messages[currentChat.id] || [];
+                const message = chatMessagesList.find(m => m.id === messageId);
+                if (message && message.reactions && message.reactions[reaction]) {
+                    message.reactions[reaction]--;
+                    if (message.reactions[reaction] <= 0) {
+                        delete message.reactions[reaction];
+                    }
+                    renderMessages();
+                }
+            }
+        }
 
         // ========== СИСТЕМА УВЕДОМЛЕНИЙ ==========
         function addNotification(notification) {
@@ -1400,18 +1563,6 @@
             input.click();
         };
 
-        // ========== РЕАКЦИИ ==========
-        function addReaction(messageId, reaction) {
-            if (socket && currentChat) {
-                socket.send(JSON.stringify({ 
-                    type: 'reaction', 
-                    messageId: messageId, 
-                    reaction: reaction, 
-                    chatId: currentChat.id 
-                }));
-            }
-        }
-
         // ========== УПРАВЛЕНИЕ КОНТАКТАМИ ==========
         function blockContact(contactId) {
             if (!blockedUsers.includes(contactId)) {
@@ -1433,6 +1584,7 @@
             if (socket) {
                 socket.send(JSON.stringify({ type: 'delete_friend', friendId: contactId }));
                 contacts = contacts.filter(c => c.id !== contactId);
+                saveContacts();
                 updateContacts();
                 showNotification('Контакт удален', 'info');
             }
@@ -1726,6 +1878,11 @@
             chatMessagesList.forEach(msg => {
                 const msgDiv = document.createElement('div');
                 msgDiv.className = `message ${msg.from === currentUser.id ? 'message-mine' : 'message-other'}`;
+                msgDiv.onclick = (e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    showReactionPicker(msg.id, rect.left + rect.width/2, rect.top);
+                };
                 
                 let content = '';
                 if (msg.fileData) {
@@ -1832,6 +1989,7 @@
                     token = data.token;
                     localStorage.setItem('token', token);
                     currentUser = data.user;
+                    saveCurrentUser();
                     updateUIForUser();
                     connectWebSocket();
                     showNotification('Вход выполнен', 'success');
@@ -1855,6 +2013,7 @@
                     token = data.token;
                     localStorage.setItem('token', token);
                     currentUser = data.user;
+                    saveCurrentUser();
                     updateUIForUser();
                     connectWebSocket();
                     showNotification('Регистрация успешна', 'success');
@@ -1889,6 +2048,8 @@
                         console.log('✅ Авторизация успешна');
                         currentUser = { ...currentUser, ...data.user };
                         contacts = data.contacts || [];
+                        saveContacts();
+                        saveCurrentUser();
                         updateContacts();
                         showScreen('contacts');
                         break;
@@ -1896,6 +2057,7 @@
                     case 'friends_list':
                         console.log('📋 Обновление списка друзей:', data.friends);
                         contacts = data.friends || [];
+                        saveContacts();
                         updateContacts();
                         break;
                         
@@ -2022,6 +2184,28 @@
                             showScreen('contacts');
                         }
                         showNotification('Группа удалена', 'info');
+                        break;
+                        
+                    case 'reaction':
+                        if (data.chatId && messages[data.chatId]) {
+                            const msg = messages[data.chatId].find(m => m.id === data.messageId);
+                            if (msg) {
+                                if (!msg.reactions) msg.reactions = {};
+                                if (data.remove) {
+                                    if (msg.reactions[data.reaction]) {
+                                        msg.reactions[data.reaction]--;
+                                        if (msg.reactions[data.reaction] <= 0) {
+                                            delete msg.reactions[data.reaction];
+                                        }
+                                    }
+                                } else {
+                                    msg.reactions[data.reaction] = (msg.reactions[data.reaction] || 0) + 1;
+                                }
+                                if (currentChat && currentChat.id === data.chatId) {
+                                    renderMessages();
+                                }
+                            }
+                        }
                         break;
                         
                     case 'error':
@@ -2245,6 +2429,7 @@
                 }));
                 currentUser.name = editName.value;
                 currentUser.bio = editBio.value;
+                saveCurrentUser();
                 updateUIForUser();
             }
             editProfileModal.classList.remove('active');
@@ -2291,15 +2476,17 @@
         }, 30000);
 
         // ========== ИНИЦИАЛИЗАЦИЯ ==========
-        if (token) {
+        if (token && currentUser) {
             connectWebSocket();
             showScreen('contacts');
+            updateUIForUser();
         } else {
             showScreen('auth');
         }
     </script>
 </body>
 </html>
+
 
 
 

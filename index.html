@@ -48,7 +48,6 @@
             box-shadow: 0 0 20px rgba(0,0,0,0.05);
         }
 
-        /* Статус бар с колокольчиком */
         .status-bar {
             background: var(--surface);
             padding: 12px 16px;
@@ -132,7 +131,6 @@
             font-size: 16px;
         }
 
-        /* Основной контент */
         .main-content {
             flex: 1;
             overflow-y: auto;
@@ -289,6 +287,15 @@
         .verified-badge {
             color: var(--primary);
             font-size: 14px;
+        }
+
+        .blocked-badge {
+            color: var(--error);
+            font-size: 12px;
+            background: rgba(241, 91, 111, 0.1);
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
         }
 
         .chat-messages {
@@ -651,11 +658,6 @@
             color: var(--text);
         }
 
-        .modal-button-danger {
-            background: var(--error);
-            color: white;
-        }
-
         .notification-container {
             position: fixed;
             top: 80px;
@@ -806,6 +808,7 @@
             max-height: 200px;
             border-radius: 8px;
             margin-top: 8px;
+            cursor: pointer;
         }
 
         .file-message {
@@ -966,7 +969,7 @@
             <p id="confirmMessage" style="margin-bottom: 20px;"></p>
             <div class="modal-buttons">
                 <button id="confirmCancel" class="modal-button modal-button-secondary">Отмена</button>
-                <button id="confirmOk" class="modal-button modal-button-danger">Подтвердить</button>
+                <button id="confirmOk" class="modal-button modal-button-primary">Подтвердить</button>
             </div>
         </div>
     </div>
@@ -979,7 +982,6 @@
         let contacts = [];
         let messages = JSON.parse(localStorage.getItem('messages')) || {};
         let currentChat = null;
-        let groups = JSON.parse(localStorage.getItem('groups')) || [];
         let socket = null;
         let currentTab = 'contacts';
         let pendingRequests = [];
@@ -1134,7 +1136,7 @@
         };
 
         function openChatFromNotification(chatId) {
-            const contact = contacts.find(c => c.id === chatId) || groups.find(g => g.id === chatId) || { id: chatId, name: chatId };
+            const contact = contacts.find(c => c.id === chatId) || { id: chatId, name: chatId };
             openChat(contact);
             if (notificationPopup) { notificationPopup.remove(); notificationPopup = null; }
         }
@@ -1220,23 +1222,52 @@
         }
 
         function clearChat(contactId) {
-            if (messages[contactId]) {
-                messages[contactId] = [];
-                saveMessages();
-                if (currentChat && currentChat.id === contactId) renderMessages();
-                showNotification('Чат очищен', 'success');
+            if (!socket) {
+                showNotification('Нет соединения с сервером', 'error');
+                return;
             }
+            
+            showConfirm('Очистить чат', 'Вы уверены, что хотите очистить историю сообщений? Это действие нельзя отменить.', () => {
+                socket.send(JSON.stringify({
+                    type: 'clear_chat',
+                    chatId: contactId
+                }));
+                
+                // Очищаем локально сразу для отзывчивости
+                if (messages[contactId]) {
+                    messages[contactId] = [];
+                    saveMessages();
+                    if (currentChat && currentChat.id === contactId) {
+                        renderMessages();
+                    }
+                }
+                
+                showNotification('Запрос на очистку чата отправлен', 'success');
+            });
         }
 
         function clearChannel() {
-            if (currentUser && currentUser.id === 'admin' && currentChat && currentChat.id === 'channel') {
+            if (!socket || currentUser?.id !== 'admin') {
+                showNotification('Только администратор может очищать канал', 'error');
+                return;
+            }
+            
+            showConfirm('Очистить канал', 'Вы уверены, что хотите очистить все сообщения в канале? Это действие нельзя отменить.', () => {
+                socket.send(JSON.stringify({
+                    type: 'clear_channel'
+                }));
+                
+                // Очищаем локально
                 if (messages['channel']) {
                     messages['channel'] = [];
                     saveMessages();
-                    renderMessages();
-                    showNotification('Канал очищен', 'success');
+                    if (currentChat && currentChat.id === 'channel') {
+                        renderMessages();
+                    }
                 }
-            }
+                
+                showNotification('Канал очищен', 'success');
+            });
         }
 
         function updateChatMenu() {
@@ -1416,44 +1447,69 @@
                         updateContacts();
                         showScreen('contacts');
                         break;
+                        
                     case 'friends_list':
                         contacts = data.friends || [];
                         updateContacts();
                         break;
+                        
                     case 'friend_request':
                         showFriendRequestNotification({ from: data.from, fromName: data.fromName || data.from });
                         break;
+                        
                     case 'friend_request_sent':
                         showNotification(`Запрос отправлен ${data.to}`, 'success');
                         break;
+                        
                     case 'friend_request_accepted':
                         showNotification(data.message, 'success');
                         break;
+                        
                     case 'message':
                         addMessage(data.from, data.from, data.text, data.timestamp);
                         break;
+                        
                     case 'file_message':
                         addMessage(data.from, data.from, '', data.timestamp, data.fileData, data.fileName, data.fileType);
                         break;
+                        
                     case 'channel_message':
-                        if (currentUser) addMessage('channel', 'channel', data.content, data.timestamp, data.fileData, data.fileName, data.fileType);
+                        if (currentUser) {
+                            addMessage('channel', 'channel', data.content, data.timestamp, data.fileData, data.fileName, data.fileType);
+                        }
                         break;
+                        
                     case 'channel_stats':
                         channelStats = { subscribers: data.subscribers, views: data.views };
                         if (currentChat && currentChat.id === 'channel') {
                             chatStatus.innerHTML = `${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров`;
                         }
                         break;
-                    case 'reaction':
+                        
+                    case 'chat_cleared':
+                        // Очищаем сообщения в чате у получателя
                         if (messages[data.chatId]) {
-                            const msg = messages[data.chatId].find(m => m.id === data.messageId);
-                            if (msg) {
-                                if (!msg.reactions) msg.reactions = {};
-                                msg.reactions[data.reaction] = (msg.reactions[data.reaction] || 0) + 1;
-                                if (currentChat?.id === data.chatId) renderMessages();
+                            messages[data.chatId] = [];
+                            saveMessages();
+                            if (currentChat && currentChat.id === data.chatId) {
+                                renderMessages();
                             }
                         }
+                        showNotification('Чат был очищен', 'info');
                         break;
+                        
+                    case 'channel_cleared':
+                        // Очищаем сообщения в канале у всех подписчиков
+                        if (messages['channel']) {
+                            messages['channel'] = [];
+                            saveMessages();
+                            if (currentChat && currentChat.id === 'channel') {
+                                renderMessages();
+                            }
+                        }
+                        showNotification('Канал был очищен администратором', 'warning');
+                        break;
+                        
                     case 'error':
                         showNotification(data.message, 'error');
                         break;
@@ -1593,6 +1649,7 @@
     </script>
 </body>
 </html>
+
 
 
 

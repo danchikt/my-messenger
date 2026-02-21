@@ -113,23 +113,6 @@
             transition: all 0.2s;
         }
 
-        .logout-button {
-            background: var(--error);
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.2s;
-            margin-left: 8px;
-        }
-
-        .logout-button:hover {
-            opacity: 0.8;
-        }
-
         .user-info {
             display: flex;
             align-items: center;
@@ -950,7 +933,6 @@
                 <div id="userInfo" class="user-info hidden">
                     <div id="userAvatar" class="user-avatar-small">?</div>
                     <span id="userName"></span>
-                    <button id="logoutBtn" class="logout-button">Выйти</button>
                 </div>
             </div>
         </div>
@@ -1133,7 +1115,6 @@
 
         const statusEl = document.getElementById('statusDisplay');
         const authButton = document.getElementById('authButton');
-        const logoutBtn = document.getElementById('logoutBtn');
         const userInfo = document.getElementById('userInfo');
         const userName = document.getElementById('userName');
         const userAvatar = document.getElementById('userAvatar');
@@ -1257,49 +1238,9 @@
             confirmTitle.textContent = title;
             confirmMessage.textContent = message;
             confirmModal.classList.add('active');
-            
-            const originalOnClick = confirmOk.onclick;
-            confirmOk.onclick = () => { 
-                onConfirm(); 
-                confirmModal.classList.remove('active');
-                confirmOk.onclick = originalOnClick;
-            };
-            
-            confirmCancel.onclick = () => {
-                confirmModal.classList.remove('active');
-            };
+            confirmOk.onclick = () => { onConfirm(); confirmModal.classList.remove('active'); };
+            confirmCancel.onclick = () => confirmModal.classList.remove('active');
         }
-
-        function logout() {
-            showConfirm('Выход из аккаунта', 'Вы уверены, что хотите выйти?', () => {
-                // Закрываем соединение
-                if (socket) {
-                    socket.close();
-                    socket = null;
-                }
-                
-                // Очищаем данные пользователя
-                currentUser = null;
-                token = null;
-                localStorage.removeItem('token');
-                
-                // Очищаем состояние
-                contacts = [];
-                groups = [];
-                messages = {};
-                notifications = [];
-                pendingRequests = [];
-                blockedUsers = [];
-                
-                // Обновляем интерфейс
-                updateUIForUser();
-                showScreen('auth');
-                showNotification('Вы вышли из аккаунта', 'info');
-            });
-        }
-
-        // Добавляем обработчик для кнопки выхода
-        logoutBtn.onclick = logout;
 
         function addNotification(notification) {
             notifications.unshift(notification);
@@ -1559,16 +1500,14 @@
                     memberId: memberId
                 }));
                 
+                // Локально обновляем список участников
                 const group = groups.find(g => g.id === currentChat.id);
                 if (group && group.members) {
                     group.members = group.members.filter(id => id !== memberId);
                     saveGroups();
-                    showGroupMembers();
-                    if (currentChat && currentChat.id === currentChat.id) {
-                        chatStatus.textContent = `${group.members.length} участников`;
-                    }
                 }
                 
+                showGroupMembers();
                 showNotification('Участник исключен', 'success');
             });
         }
@@ -1592,31 +1531,6 @@
             });
         }
 
-        function leaveGroup() {
-            if (!currentChat || !currentChat.id.startsWith('group_')) return;
-            
-            showConfirm('Покинуть группу', 'Вы уверены, что хотите покинуть группу?', () => {
-                if (socket) {
-                    socket.send(JSON.stringify({
-                        type: 'leave_group',
-                        groupId: currentChat.id
-                    }));
-                    
-                    const group = groups.find(g => g.id === currentChat.id);
-                    if (group && group.members) {
-                        group.members = group.members.filter(id => id !== currentUser.id);
-                        if (group.members.length === 0) {
-                            groups = groups.filter(g => g.id !== currentChat.id);
-                        }
-                        saveGroups();
-                    }
-                    
-                    showScreen('contacts');
-                    showNotification('Вы покинули группу', 'info');
-                }
-            });
-        }
-
         function updateChatMenu() {
             if (!currentChat) { chatMenu.style.display = 'none'; return; }
             
@@ -1634,7 +1548,7 @@
                         menuHtml += `<div class="chat-menu-item" onclick="addToGroup()"><span>➕</span> Добавить участников</div>`;
                         menuHtml += `<div class="chat-menu-item danger" onclick="deleteGroup()"><span>🗑️</span> Удалить группу</div>`;
                     } else {
-                        menuHtml += `<div class="chat-menu-item warning" onclick="leaveGroup()"><span>🚪</span> Покинуть группу</div>`;
+                        menuHtml += `<div class="chat-menu-item danger" onclick="leaveGroup()"><span>🚪</span> Покинуть группу</div>`;
                     }
                     menuHtml += `<div class="chat-menu-item" onclick="clearChat('${currentChat.id}')"><span>🧹</span> Очистить чат</div>`;
                 }
@@ -1956,6 +1870,7 @@
                         
                     case 'member_kicked':
                         if (data.groupId && data.memberId === currentUser?.id) {
+                            // Текущего пользователя исключили
                             groups = groups.filter(g => g.id !== data.groupId);
                             saveGroups();
                             updateContacts();
@@ -1964,6 +1879,7 @@
                             }
                             showNotification('Вас исключили из группы', 'warning');
                         } else if (data.groupId) {
+                            // Обновляем список участников
                             const group = groups.find(g => g.id === data.groupId);
                             if (group && group.members) {
                                 group.members = group.members.filter(id => id !== data.memberId);
@@ -1999,27 +1915,20 @@
         }
 
         function updateUIForUser() {
-            if (currentUser) {
-                authButton.classList.add('hidden');
-                userInfo.classList.remove('hidden');
-                userName.textContent = currentUser.name || currentUser.username;
-                userAvatar.textContent = getInitials(currentUser.name || currentUser.username);
-                profileName.textContent = currentUser.name || currentUser.username;
-                profileUsername.textContent = '@' + currentUser.username;
-                profileBio.textContent = currentUser.bio || 'Нет описания';
-                profileAvatar.textContent = getInitials(currentUser.name || currentUser.username);
-            } else {
-                authButton.classList.remove('hidden');
-                userInfo.classList.add('hidden');
-            }
+            authButton.classList.add('hidden');
+            userInfo.classList.remove('hidden');
+            userName.textContent = currentUser.name || currentUser.username;
+            userAvatar.textContent = getInitials(currentUser.name || currentUser.username);
+            profileName.textContent = currentUser.name || currentUser.username;
+            profileUsername.textContent = '@' + currentUser.username;
+            profileBio.textContent = currentUser.bio || 'Нет описания';
+            profileAvatar.textContent = getInitials(currentUser.name || currentUser.username);
             updateContacts();
         }
 
         function updateContacts() {
             const searchTerm = searchContacts?.value?.toLowerCase() || '';
             contactsList.innerHTML = '';
-            
-            if (!currentUser) return;
             
             // Канал
             const channelEl = document.createElement('div');
@@ -2245,6 +2154,7 @@
     </script>
 </body>
 </html>
+
 
 
 

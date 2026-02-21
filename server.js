@@ -84,24 +84,6 @@ db.serialize(() => {
         FOREIGN KEY (user_id) REFERENCES users(id)
     )`);
 
-    db.run(`CREATE TABLE IF NOT EXISTS groups (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        description TEXT,
-        created_by TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (created_by) REFERENCES users(id)
-    )`);
-
-    db.run(`CREATE TABLE IF NOT EXISTS group_members (
-        group_id TEXT,
-        user_id TEXT,
-        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (group_id, user_id),
-        FOREIGN KEY (group_id) REFERENCES groups(id),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
     // Создаём админа
     bcrypt.hash('050506fyu', 10, (err, hash) => {
         if (err) throw err;
@@ -124,6 +106,15 @@ app.use(express.json({ limit: '50mb' }));
 
 // Хранилище активных WebSocket соединений
 const clients = new Map();
+
+// Вспомогательная функция для получения списка друзей
+function getFriendsList(userId, callback) {
+    db.all(`SELECT u.* FROM users u
+            JOIN friends f ON (f.friend_id = u.id OR f.user_id = u.id)
+            WHERE (f.user_id = ? OR f.friend_id = ?) 
+            AND f.status = 'accepted' AND u.id != ?`,
+        [userId, userId, userId], callback);
+}
 
 // ========== HTTP ЭНДПОИНТЫ ==========
 
@@ -153,7 +144,6 @@ app.post('/api/register', async (req, res) => {
                 
                 const token = jwt.sign({ userId, username }, JWT_SECRET);
                 
-                // Подписываем на канал
                 db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [userId]);
                 
                 res.json({ 
@@ -240,20 +230,14 @@ wss.on('connection', (ws) => {
                         db.run(`UPDATE users SET status = 'online' WHERE id = ?`, [currentUser.userId]);
                         
                         // Получаем контакты
-                        db.all(`SELECT u.* FROM users u
-                                JOIN friends f ON (f.friend_id = u.id OR f.user_id = u.id)
-                                WHERE (f.user_id = ? OR f.friend_id = ?) 
-                                AND f.status = 'accepted' AND u.id != ?`,
-                            [currentUser.userId, currentUser.userId, currentUser.userId], (err, contacts) => {
-                                ws.send(JSON.stringify({
-                                    type: 'auth_success',
-                                    user: currentUser,
-                                    contacts: contacts || []
-                                }));
-                            }
-                        );
+                        getFriendsList(currentUser.userId, (err, contacts) => {
+                            ws.send(JSON.stringify({
+                                type: 'auth_success',
+                                user: currentUser,
+                                contacts: contacts || []
+                            }));
+                        });
                         
-                        // Подписываем на канал
                         db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [currentUser.userId]);
                         
                     } catch (e) {
@@ -337,7 +321,6 @@ wss.on('connection', (ws) => {
                                 return;
                             }
                             
-                            // Получаем всех подписчиков
                             db.all(`SELECT user_id FROM channel_subscribers`, [], (err, subscribers) => {
                                 if (err) return;
                                 
@@ -355,7 +338,6 @@ wss.on('connection', (ws) => {
                                     message.fileType = channelFileType;
                                 }
                                 
-                                // Рассылаем всем подписчикам
                                 subscribers.forEach(sub => {
                                     const subscriberWs = clients.get(sub.user_id);
                                     if (subscriberWs && subscriberWs.readyState === WebSocket.OPEN) {
@@ -412,26 +394,23 @@ wss.on('connection', (ws) => {
                             WHERE user_id = ? AND friend_id = ?`,
                         [requesterId, currentUser.userId], function(err) {
                             if (!err) {
-                                // Отправляем обновлённые списки обоим
-                                db.all(`SELECT u.* FROM users u
-                                        JOIN friends f ON (f.friend_id = u.id OR f.user_id = u.id)
-                                        WHERE (f.user_id = ? OR f.friend_id = ?) 
-                                        AND f.status = 'accepted' AND u.id != ?`,
-                                    [currentUser.userId, currentUser.userId, currentUser.userId], (err, contacts) => {
-                                        ws.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
-                                    }
-                                );
+                                // Отправляем обновлённый список ТОМУ, КТО ПРИНЯЛ (текущий пользователь)
+                                getFriendsList(currentUser.userId, (err, contacts) => {
+                                    ws.send(JSON.stringify({ 
+                                        type: 'friends_list', 
+                                        friends: contacts 
+                                    }));
+                                });
                                 
+                                // Отправляем обновлённый список ТОМУ, КТО ОТПРАВИЛ ЗАЯВКУ (requesterId)
                                 const requesterWs = clients.get(requesterId);
                                 if (requesterWs) {
-                                    db.all(`SELECT u.* FROM users u
-                                            JOIN friends f ON (f.friend_id = u.id OR f.user_id = u.id)
-                                            WHERE (f.user_id = ? OR f.friend_id = ?) 
-                                            AND f.status = 'accepted' AND u.id != ?`,
-                                        [requesterId, requesterId, requesterId], (err, contacts) => {
-                                            requesterWs.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
-                                        }
-                                    );
+                                    getFriendsList(requesterId, (err, contacts) => {
+                                        requesterWs.send(JSON.stringify({ 
+                                            type: 'friends_list', 
+                                            friends: contacts 
+                                        }));
+                                    });
                                     
                                     requesterWs.send(JSON.stringify({
                                         type: 'friend_request_accepted',
@@ -452,19 +431,34 @@ wss.on('connection', (ws) => {
                         [declineId, currentUser.userId]);
                     break;
 
-                case 'create_group':
+                case 'delete_friend':
                     if (!currentUser) break;
                     
-                    const { groupName, groupDescription } = data;
-                    const groupId = 'group_' + Date.now();
+                    const { friendId: deleteId } = data;
                     
-                    db.serialize(() => {
-                        db.run(`INSERT INTO groups (id, name, description, created_by) VALUES (?, ?, ?, ?)`,
-                            [groupId, groupName, groupDescription, currentUser.userId]);
-                        
-                        db.run(`INSERT INTO group_members (group_id, user_id) VALUES (?, ?)`,
-                            [groupId, currentUser.userId]);
+                    db.run(`DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)`,
+                        [currentUser.userId, deleteId, deleteId, currentUser.userId]);
+                    
+                    // Обновляем списки у обоих
+                    getFriendsList(currentUser.userId, (err, contacts) => {
+                        ws.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
                     });
+                    
+                    const deletedFriendWs = clients.get(deleteId);
+                    if (deletedFriendWs) {
+                        getFriendsList(deleteId, (err, contacts) => {
+                            deletedFriendWs.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
+                        });
+                    }
+                    break;
+
+                case 'update_profile':
+                    if (!currentUser) break;
+                    
+                    const { name, bio, avatar } = data;
+                    
+                    db.run(`UPDATE users SET name = ?, bio = ?, avatar = ? WHERE id = ?`,
+                        [name, bio, avatar, currentUser.userId]);
                     break;
 
                 case 'get_channel_stats':
@@ -483,6 +477,10 @@ wss.on('connection', (ws) => {
                     if (currentUser) {
                         db.run(`INSERT OR IGNORE INTO channel_views (user_id) VALUES (?)`, [currentUser.userId]);
                     }
+                    break;
+
+                case 'reaction':
+                    // Здесь будет логика реакций (для будущего обновления)
                     break;
             }
         } catch (e) {

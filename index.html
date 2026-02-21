@@ -2,16 +2,29 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <link rel="manifest" href="/manifest.json">
-    <meta name="theme-color" content="#667eea">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#8774e1">
+    <link rel="manifest" href="/manifest.json">
     <title>Мой Мессенджер</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        :root {
+            --primary: #8774e1;
+            --primary-dark: #6b5b9e;
+            --secondary: #31c4b2;
+            --bg: #f8f9fa;
+            --surface: #ffffff;
+            --text: #1c1e21;
+            --text-secondary: #65676b;
+            --border: #e4e6eb;
+            --error: #f15b6f;
+            --success: #31c4b2;
         }
 
         body {
@@ -20,413 +33,395 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 10px;
+            padding: 0;
+            margin: 0;
         }
 
         .app-container {
             width: 100%;
-            max-width: 600px;
-            height: 95vh;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 500px;
+            height: 100vh;
+            max-height: 900px;
+            background: var(--bg);
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            border-radius: 0;
+            box-shadow: none;
+        }
+
+        @media (min-width: 500px) {
+            .app-container {
+                height: 95vh;
+                border-radius: 30px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            }
         }
 
         /* Статус бар */
         .status-bar {
-            background: #f8f9fa;
-            padding: 8px 15px;
+            background: var(--surface);
+            padding: 12px 16px;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid #e9ecef;
+            border-bottom: 1px solid var(--border);
             font-size: 14px;
+            font-weight: 500;
         }
 
         .status-connected {
-            color: #28a745;
-            display: flex;
-            align-items: center;
-            gap: 5px;
+            color: var(--success);
         }
 
         .status-disconnected {
-            color: #dc3545;
-            display: flex;
-            align-items: center;
-            gap: 5px;
+            color: var(--error);
         }
 
-        .connection-btn {
-            padding: 6px 12px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 13px;
-            transition: all 0.3s;
-        }
-
-        .connect-btn {
-            background: #28a745;
-            color: white;
-        }
-
-        .disconnect-btn {
-            background: #dc3545;
-            color: white;
-        }
-
-        /* Основной контейнер */
-        .main-container {
-            display: flex;
-            flex: 1;
-            overflow: hidden;
-            position: relative;
-        }
-
-        /* Левая колонка - Контакты */
-        .contacts-sidebar {
-            width: 280px;
-            background: #f8f9fa;
-            border-right: 1px solid #e9ecef;
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.3s ease;
-            position: absolute;
-            top: 0;
-            left: 0;
-            bottom: 0;
-            z-index: 10;
-            transform: translateX(-100%);
-        }
-
-        .contacts-sidebar.active {
-            transform: translateX(0);
-        }
-
-        .contacts-header {
-            padding: 15px;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .contacts-header h3 {
-            color: #495057;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .requests-badge {
-            background: #dc3545;
-            color: white;
-            border-radius: 50%;
-            padding: 2px 8px;
-            font-size: 12px;
-            cursor: pointer;
-        }
-
-        .add-friend-btn {
-            width: 100%;
-            padding: 10px;
-            background: #667eea;
+        .auth-button {
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 8px;
-            cursor: pointer;
+            padding: 8px 16px;
+            border-radius: 20px;
             font-weight: 600;
-            margin-bottom: 10px;
-            transition: background 0.3s;
             font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .search-contacts {
-            width: 100%;
-            padding: 8px;
-            border: 1px solid #ced4da;
-            border-radius: 8px;
-            font-size: 14px;
+        .auth-button:hover {
+            background: var(--primary-dark);
         }
 
-        .contacts-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-        }
-
-        .contact-item {
+        .user-info {
             display: flex;
             align-items: center;
-            padding: 8px;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: background 0.3s;
-            margin-bottom: 5px;
-            position: relative;
+            gap: 8px;
         }
 
-        .contact-item:hover {
-            background: #e9ecef;
-        }
-
-        .contact-item.selected {
-            background: #e3f2fd;
-        }
-
-        .contact-avatar {
-            width: 35px;
-            height: 35px;
+        .user-avatar-small {
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
-            margin-right: 10px;
-            object-fit: cover;
-        }
-
-        .contact-info {
-            flex: 1;
-        }
-
-        .contact-name {
-            font-weight: 600;
-            color: #212529;
-            font-size: 14px;
-        }
-
-        .contact-status {
-            font-size: 11px;
-            color: #6c757d;
-        }
-
-        .online-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: #28a745;
-            position: absolute;
-            right: 10px;
-        }
-
-        /* Центральная колонка - Чат */
-        .chat-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: white;
-            width: 100%;
-        }
-
-        .chat-header {
-            padding: 12px 15px;
-            border-bottom: 1px solid #e9ecef;
+            background: var(--primary);
+            color: white;
             display: flex;
             align-items: center;
-            background: white;
-        }
-
-        .menu-toggle {
-            font-size: 24px;
-            cursor: pointer;
-            margin-right: 10px;
-            color: #667eea;
-            display: block;
-        }
-
-        .chat-header-info {
-            flex: 1;
-        }
-
-        .chat-header-name {
-            font-weight: 600;
-            color: #212529;
+            justify-content: center;
+            font-weight: bold;
             font-size: 16px;
         }
 
-        .chat-header-status {
-            font-size: 12px;
-            color: #6c757d;
-        }
-
-        .messages-container {
+        /* Основной контент */
+        .main-content {
             flex: 1;
             overflow-y: auto;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            background: #f5f7fb;
-        }
-
-        .message {
-            max-width: 80%;
-            margin-bottom: 10px;
-            padding: 10px 12px;
-            border-radius: 15px;
-            position: relative;
-            font-size: 14px;
-            word-wrap: break-word;
-        }
-
-        .message-mine {
-            align-self: flex-end;
-            background: #667eea;
-            color: white;
-            border-bottom-right-radius: 4px;
-        }
-
-        .message-other {
-            align-self: flex-start;
-            background: white;
-            color: #212529;
-            border-bottom-left-radius: 4px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        }
-
-        .message-time {
-            font-size: 9px;
-            margin-top: 4px;
-            opacity: 0.7;
-            text-align: right;
-        }
-
-        .chat-input-area {
-            padding: 12px;
-            border-top: 1px solid #e9ecef;
-            display: flex;
-            gap: 8px;
-            background: white;
-        }
-
-        .chat-input {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ced4da;
-            border-radius: 20px;
-            font-size: 14px;
-            outline: none;
-        }
-
-        .chat-input:focus {
-            border-color: #667eea;
-        }
-
-        .send-btn {
-            padding: 10px 20px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 20px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-        }
-
-        .send-btn:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-        }
-
-        /* Правая колонка - Профиль */
-        .profile-sidebar {
-            width: 280px;
-            background: #f8f9fa;
-            border-left: 1px solid #e9ecef;
-            overflow-y: auto;
-            position: absolute;
-            top: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 10;
-            transform: translateX(100%);
-            transition: transform 0.3s ease;
-        }
-
-        .profile-sidebar.active {
-            transform: translateX(0);
-        }
-
-        .profile-header {
-            padding: 20px 15px;
-            text-align: center;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .profile-avatar {
-            width: 70px;
-            height: 70px;
-            border-radius: 50%;
-            margin-bottom: 10px;
-            object-fit: cover;
-        }
-
-        .profile-name {
-            font-size: 18px;
-            font-weight: 600;
-            color: #212529;
-            margin-bottom: 5px;
-        }
-
-        .profile-bio {
-            color: #6c757d;
-            font-size: 13px;
-            margin-bottom: 10px;
-        }
-
-        .edit-profile-btn {
-            padding: 6px 12px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-
-        .edit-profile-form {
-            padding: 15px;
+            padding: 16px;
             display: none;
         }
 
-        .edit-profile-form.active {
+        .main-content.active {
             display: block;
         }
 
-        .edit-profile-form input,
-        .edit-profile-form textarea {
-            width: 100%;
-            padding: 8px;
-            margin-bottom: 10px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
+        /* Экраны */
+        .auth-screen, .contacts-screen, .chats-screen, .profile-screen, .channel-screen {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
         }
 
-        .edit-profile-form textarea {
-            height: 60px;
-            resize: none;
+        /* Формы */
+        .auth-form {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 24px;
+            margin-top: 20px;
         }
 
-        .save-profile-btn {
-            width: 100%;
-            padding: 10px;
-            background: #28a745;
-            color: white;
+        .auth-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            background: none;
             border: none;
-            border-radius: 4px;
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            color: var(--text-secondary);
             cursor: pointer;
         }
 
+        .auth-tab.active {
+            border-bottom-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .auth-input {
+            width: 100%;
+            padding: 14px 16px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 16px;
+            background: var(--bg);
+        }
+
+        .auth-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .auth-submit {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        /* Поиск */
+        .search-bar {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 8px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid var(--border);
+        }
+
+        .search-bar input {
+            flex: 1;
+            border: none;
+            background: none;
+            padding: 8px 0;
+            font-size: 16px;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+        }
+
+        /* Список контактов */
+        .contacts-list, .chats-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .contact-item, .chat-item {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .contact-item:hover, .chat-item:hover {
+            background: #f0f2f5;
+        }
+
+        .contact-avatar, .chat-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 20px;
+        }
+
+        .contact-info, .chat-info {
+            flex: 1;
+        }
+
+        .contact-name, .chat-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .contact-status, .chat-last-message {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Профиль */
+        .profile-header {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .profile-avatar-large {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 40px;
+            margin: 0 auto 16px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .avatar-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .profile-avatar-large:hover .avatar-overlay {
+            opacity: 1;
+        }
+
+        .profile-name {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .profile-username {
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            font-size: 16px;
+        }
+
+        .profile-bio {
+            color: var(--text);
+            margin-bottom: 20px;
+            font-size: 16px;
+        }
+
+        .profile-stats {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-weight: 600;
+            font-size: 20px;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+
+        /* Канал */
+        .channel-header {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 16px;
+        }
+
+        .channel-badge {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            display: inline-block;
+            margin-top: 8px;
+        }
+
+        .channel-message {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+
+        .channel-message-author {
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .channel-message-time {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Табы */
+        .bottom-tabs {
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 16px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+        }
+
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 20px;
+            transition: all 0.2s;
+        }
+
+        .tab-button.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Модальные окна */
         .modal {
             display: none;
             position: fixed;
             top: 0;
             left: 0;
-            width: 100%;
-            height: 100%;
+            right: 0;
+            bottom: 0;
             background: rgba(0,0,0,0.5);
-            justify-content: center;
             align-items: center;
+            justify-content: center;
             z-index: 1000;
         }
 
@@ -435,697 +430,84 @@
         }
 
         .modal-content {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 24px;
             width: 90%;
-            max-width: 350px;
+            max-width: 400px;
         }
 
-        .modal-content h3 {
-            margin-bottom: 15px;
-            color: #212529;
-            font-size: 18px;
+        .modal-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
         }
 
-        .modal-content input {
+        .modal-input {
             width: 100%;
-            padding: 10px;
-            margin-bottom: 15px;
-            border: 1px solid #ced4da;
-            border-radius: 4px;
-            font-size: 14px;
+            padding: 14px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            font-size: 16px;
         }
 
         .modal-buttons {
             display: flex;
-            gap: 10px;
+            gap: 12px;
             justify-content: flex-end;
         }
 
-        .modal-buttons button {
-            padding: 8px 16px;
+        .modal-button {
+            padding: 12px 20px;
             border: none;
-            border-radius: 4px;
-            cursor: pointer;
+            border-radius: 12px;
             font-weight: 600;
-        }
-
-        .modal-confirm {
-            background: #667eea;
-            color: white;
-        }
-
-        .modal-cancel {
-            background: #6c757d;
-            color: white;
-        }
-
-        .friend-profile {
-            padding: 20px 15px;
-            text-align: center;
-        }
-
-        .friend-avatar {
-            width: 80px;
-            height: 80px;
-            border-radius: 50%;
-            margin-bottom: 15px;
-            object-fit: cover;
-        }
-
-        .friend-name {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 8px;
-        }
-
-        .friend-bio {
-            color: #6c757d;
-            font-size: 13px;
-            margin-bottom: 15px;
-        }
-
-        .back-to-profile {
-            padding: 8px 16px;
-            background: #6c757d;
-            color: white;
-            border: none;
-            border-radius: 4px;
             cursor: pointer;
-            margin-top: 15px;
+        }
+
+        .modal-button-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .modal-button-secondary {
+            background: var(--border);
+            color: var(--text);
         }
 
         /* Уведомления */
-        #notificationContainer {
+        .notification-container {
             position: fixed;
-            top: 10px;
-            right: 10px;
-            left: 10px;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 2000;
-            pointer-events: none;
+            width: 90%;
+            max-width: 400px;
         }
 
         .notification {
-            background: white;
-            border-left: 4px solid #667eea;
-            border-radius: 4px;
-            padding: 12px 15px;
+            background: var(--surface);
+            border-left: 4px solid var(--primary);
+            border-radius: 12px;
+            padding: 16px;
             margin-bottom: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            animation: slideIn 0.3s ease;
-            font-size: 14px;
-            pointer-events: auto;
-            max-width: 100%;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            animation: slideDown 0.3s ease;
         }
 
-        @keyframes slideIn {
+        @keyframes slideDown {
             from {
-                transform: translateX(100%);
+                transform: translateY(-100%);
                 opacity: 0;
             }
             to {
-                transform: translateX(0);
+                transform: translateY(0);
                 opacity: 1;
-            }
-        }
-
-        .notification.success {
-            border-left-color: #28a745;
-        }
-
-        .notification.error {
-            border-left-color: #dc3545;
-        }
-
-        .notification.info {
-            border-left-color: #17a2b8;
-        }
-
-        .notification-close {
-            float: right;
-            cursor: pointer;
-            color: #6c757d;
-            font-weight: bold;
-            margin-left: 10px;
-        }
-
-        @media (min-width: 768px) {
-            .contacts-sidebar {
-                position: static;
-                transform: none;
-            }
-            .profile-sidebar {
-                position: static;
-                transform: none;
-            }
-            .menu-toggle {
-                display: none;
             }
         }
     </style>
 </head>
-<body>
-    <div class="app-container">
-        <!-- Статус бар -->
-        <div class="status-bar">
-            <div id="statusDisplay" class="status-disconnected">
-                <span>🔴 Не подключено</span>
-            </div>
-            <div>
-                <span style="margin-right: 10px;">ID: <span id="currentUserId">-</span></span>
-                <button id="connectBtn" class="connection-btn connect-btn">Войти</button>
-            </div>
-        </div>
 
-        <div class="main-container">
-            <!-- Левая колонка - Контакты -->
-            <div id="contactsSidebar" class="contacts-sidebar">
-                <div class="contacts-header">
-                    <h3>
-                        Контакты
-                        <span id="requestsBadge" class="requests-badge" style="display: none;">0</span>
-                    </h3>
-                    <button id="showAddFriendModal" class="add-friend-btn">+ Добавить</button>
-                    <input type="text" id="searchContacts" class="search-contacts" placeholder="Поиск...">
-                </div>
-                <div id="contactsList" class="contacts-list"></div>
-            </div>
-
-            <!-- Центральная колонка - Чат -->
-            <div class="chat-area">
-                <div class="chat-header">
-                    <span id="menuToggle" class="menu-toggle">☰</span>
-                    <img id="chatAvatar" src="https://via.placeholder.com/40" alt="avatar" class="contact-avatar">
-                    <div class="chat-header-info">
-                        <div id="chatName" class="chat-header-name">Выберите чат</div>
-                        <div id="chatStatus" class="chat-header-status"></div>
-                    </div>
-                    <span id="profileToggle" class="menu-toggle" style="margin-right:0; margin-left:auto;">👤</span>
-                </div>
-                <div id="messagesContainer" class="messages-container"></div>
-                <div class="chat-input-area">
-                    <input type="text" id="messageInput" class="chat-input" placeholder="Сообщение..." disabled>
-                    <button id="sendBtn" class="send-btn" disabled>→</button>
-                </div>
-            </div>
-
-            <!-- Правая колонка - Профиль -->
-            <div id="profileSidebar" class="profile-sidebar">
-                <!-- Профиль загружается сюда -->
-            </div>
-        </div>
-    </div>
-
-    <!-- Модальные окна -->
-    <div id="addFriendModal" class="modal">
-        <div class="modal-content">
-            <h3>Добавить друга</h3>
-            <input type="text" id="friendIdInput" placeholder="ID пользователя">
-            <div class="modal-buttons">
-                <button id="confirmAddFriend" class="modal-confirm">Добавить</button>
-                <button id="cancelAddFriend" class="modal-cancel">Отмена</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="requestsModal" class="modal">
-        <div class="modal-content">
-            <h3>Входящие заявки</h3>
-            <div id="requestsList" style="max-height: 300px; overflow-y: auto; margin-bottom: 15px;"></div>
-            <div class="modal-buttons">
-                <button id="closeRequestsModal" class="modal-cancel">Закрыть</button>
-            </div>
-        </div>
-    </div>
-
-    <div id="friendRequestModal" class="modal">
-        <div class="modal-content">
-            <h3>Заявка в друзья</h3>
-            <div style="display: flex; align-items: center; margin-bottom: 15px;">
-                <img id="requestAvatar" src="https://via.placeholder.com/50" style="width: 40px; height: 40px; border-radius: 50%; margin-right: 10px;">
-                <div>
-                    <div id="requestName" style="font-weight: 600;"></div>
-                    <div id="requestMessage" style="color: #6c757d; font-size: 13px;"></div>
-                </div>
-            </div>
-            <div class="modal-buttons">
-                <button id="acceptFriendRequest" class="modal-confirm">Принять</button>
-                <button id="declineFriendRequest" class="modal-cancel">Отклонить</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Уведомления -->
-    <div id="notificationContainer"></div>
-
-    <script>
-        let socket = null;
-        let currentUser = {
-            id: '',
-            name: '',
-            bio: '',
-            avatar: 'https://via.placeholder.com/100'
-        };
-        let selectedContact = null;
-        let friends = [];
-        let friendRequests = [];
-        let messages = {};
-
-        // Элементы DOM
-        const connectBtn = document.getElementById('connectBtn');
-        const statusDisplay = document.getElementById('statusDisplay');
-        const currentUserId = document.getElementById('currentUserId');
-        const contactsList = document.getElementById('contactsList');
-        const messagesContainer = document.getElementById('messagesContainer');
-        const messageInput = document.getElementById('messageInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const chatName = document.getElementById('chatName');
-        const chatStatus = document.getElementById('chatStatus');
-        const chatAvatar = document.getElementById('chatAvatar');
-        const profileSidebar = document.getElementById('profileSidebar');
-        const addFriendModal = document.getElementById('addFriendModal');
-        const showAddFriendModal = document.getElementById('showAddFriendModal');
-        const confirmAddFriend = document.getElementById('confirmAddFriend');
-        const cancelAddFriend = document.getElementById('cancelAddFriend');
-        const friendIdInput = document.getElementById('friendIdInput');
-        const searchContacts = document.getElementById('searchContacts');
-        const requestsBadge = document.getElementById('requestsBadge');
-        const requestsModal = document.getElementById('requestsModal');
-        const requestsList = document.getElementById('requestsList');
-        const closeRequestsModal = document.getElementById('closeRequestsModal');
-        const friendRequestModal = document.getElementById('friendRequestModal');
-        const acceptFriendRequest = document.getElementById('acceptFriendRequest');
-        const declineFriendRequest = document.getElementById('declineFriendRequest');
-        const requestName = document.getElementById('requestName');
-        const requestMessage = document.getElementById('requestMessage');
-        const requestAvatar = document.getElementById('requestAvatar');
-        const menuToggle = document.getElementById('menuToggle');
-        const profileToggle = document.getElementById('profileToggle');
-        const contactsSidebar = document.getElementById('contactsSidebar');
-        const profileSidebarEl = document.getElementById('profileSidebar');
-
-        let currentRequestId = null;
-
-        // Функции
-        function showNotification(message, type = 'info') {
-            const container = document.getElementById('notificationContainer');
-            const notification = document.createElement('div');
-            notification.className = `notification ${type}`;
-            notification.innerHTML = `
-                <span class="notification-close" onclick="this.parentElement.remove()">×</span>
-                ${message}
-            `;
-            container.appendChild(notification);
-            setTimeout(() => notification.remove(), 4000);
-        }
-
-        function updateRequestsBadge() {
-            if (friendRequests.length > 0) {
-                requestsBadge.style.display = 'inline';
-                requestsBadge.textContent = friendRequests.length;
-            } else {
-                requestsBadge.style.display = 'none';
-            }
-        }
-
-        function showRequests() {
-            requestsList.innerHTML = '';
-            if (friendRequests.length === 0) {
-                requestsList.innerHTML = '<div style="text-align: center; color: #6c757d; padding: 15px;">Нет заявок</div>';
-            } else {
-                friendRequests.forEach(request => {
-                    const requestDiv = document.createElement('div');
-                    requestDiv.style.cssText = `
-                        display: flex; align-items: center; padding: 10px;
-                        border-bottom: 1px solid #e9ecef; cursor: pointer;
-                    `;
-                    requestDiv.onclick = () => showFriendRequestModal(request.id, request.name, request.avatar);
-                    requestDiv.innerHTML = `
-                        <img src="${request.avatar || 'https://via.placeholder.com/40'}" 
-                             style="width: 35px; height: 35px; border-radius: 50%; margin-right: 10px;">
-                        <div style="flex: 1;">
-                            <div style="font-weight: 600;">${request.name}</div>
-                            <div style="font-size: 11px; color: #6c757d;">хочет добавить вас</div>
-                        </div>
-                        <button onclick="event.stopPropagation(); acceptRequest('${request.id}')" 
-                                style="background: #28a745; color: white; border: none; 
-                                       padding: 5px 10px; border-radius: 4px; margin-right: 5px;">✓</button>
-                        <button onclick="event.stopPropagation(); declineRequest('${request.id}')" 
-                                style="background: #dc3545; color: white; border: none; 
-                                       padding: 5px 10px; border-radius: 4px;">✗</button>
-                    `;
-                    requestsList.appendChild(requestDiv);
-                });
-            }
-            requestsModal.classList.add('active');
-        }
-
-        function showFriendRequestModal(id, name, avatar) {
-            currentRequestId = id;
-            requestName.textContent = name;
-            requestMessage.textContent = `Пользователь ${name} хочет добавить вас в друзья`;
-            requestAvatar.src = avatar || 'https://via.placeholder.com/50';
-            friendRequestModal.classList.add('active');
-            requestsModal.classList.remove('active');
-        }
-
-        function acceptRequest(requesterId) {
-            if (socket) {
-                socket.send(JSON.stringify({
-                    type: 'accept_friend',
-                    requesterId: requesterId
-                }));
-                friendRequests = friendRequests.filter(r => r.id !== requesterId);
-                updateRequestsBadge();
-                showNotification(`Вы приняли заявку от ${requesterId}`, 'success');
-            }
-            friendRequestModal.classList.remove('active');
-        }
-
-        function declineRequest(requesterId) {
-            if (socket) {
-                socket.send(JSON.stringify({
-                    type: 'decline_friend',
-                    requesterId: requesterId
-                }));
-                friendRequests = friendRequests.filter(r => r.id !== requesterId);
-                updateRequestsBadge();
-                showNotification(`Заявка от ${requesterId} отклонена`, 'info');
-            }
-            friendRequestModal.classList.remove('active');
-        }
-
-        acceptFriendRequest.onclick = () => currentRequestId && acceptRequest(currentRequestId);
-        declineFriendRequest.onclick = () => currentRequestId && declineRequest(currentRequestId);
-        closeRequestsModal.onclick = () => requestsModal.classList.remove('active');
-
-        function updateStatus(connected) {
-            if (connected) {
-                statusDisplay.className = 'status-connected';
-                statusDisplay.innerHTML = '<span>🟢 Подключено</span>';
-                connectBtn.textContent = 'Выйти';
-                connectBtn.classList.remove('connect-btn');
-                connectBtn.classList.add('disconnect-btn');
-                messageInput.disabled = false;
-                sendBtn.disabled = false;
-            } else {
-                statusDisplay.className = 'status-disconnected';
-                statusDisplay.innerHTML = '<span>🔴 Не подключено</span>';
-                connectBtn.textContent = 'Войти';
-                connectBtn.classList.remove('disconnect-btn');
-                connectBtn.classList.add('connect-btn');
-                currentUserId.textContent = '-';
-                messageInput.disabled = true;
-                sendBtn.disabled = true;
-            }
-        }
-
-        function renderContacts() {
-            const searchTerm = searchContacts.value.toLowerCase();
-            const filteredFriends = friends.filter(f => 
-                f.name.toLowerCase().includes(searchTerm) || 
-                f.id.toLowerCase().includes(searchTerm)
-            );
-
-            contactsList.innerHTML = '';
-            filteredFriends.forEach(friend => {
-                const contactDiv = document.createElement('div');
-                contactDiv.className = `contact-item ${selectedContact && selectedContact.id === friend.id ? 'selected' : ''}`;
-                contactDiv.onclick = () => {
-                    selectContact(friend);
-                    if (window.innerWidth < 768) {
-                        contactsSidebar.classList.remove('active');
-                    }
-                };
-                
-                contactDiv.innerHTML = `
-                    <img src="${friend.avatar || 'https://via.placeholder.com/35'}" alt="avatar" class="contact-avatar">
-                    <div class="contact-info">
-                        <div class="contact-name">${friend.name}</div>
-                        <div class="contact-status">${friend.status === 'online' ? 'в сети' : 'не в сети'}</div>
-                    </div>
-                    ${friend.status === 'online' ? '<span class="online-dot"></span>' : ''}
-                `;
-                contactsList.appendChild(contactDiv);
-            });
-
-            if (filteredFriends.length === 0) {
-                contactsList.innerHTML = '<div style="padding: 20px; text-align: center; color: #6c757d;">Нет контактов</div>';
-            }
-        }
-
-        function renderMessages() {
-            if (!selectedContact) {
-                messagesContainer.innerHTML = '<div style="text-align: center; color: #6c757d; margin-top: 50px;">Выберите чат</div>';
-                return;
-            }
-
-            const chatMessages = messages[selectedContact.id] || [];
-            messagesContainer.innerHTML = '';
-            
-            chatMessages.forEach(msg => {
-                const messageDiv = document.createElement('div');
-                messageDiv.className = `message ${msg.from === currentUser.id ? 'message-mine' : 'message-other'}`;
-                
-                const time = new Date(msg.timestamp).toLocaleTimeString('ru-RU', {
-                    hour: '2-digit',
-                    minute: '2-digit'
-                });
-                
-                messageDiv.innerHTML = `
-                    <div>${msg.text}</div>
-                    <div class="message-time">${time}</div>
-                `;
-                messagesContainer.appendChild(messageDiv);
-            });
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
-        }
-
-        function renderProfile() {
-            profileSidebarEl.innerHTML = `
-                <div class="profile-header">
-                    <img src="${currentUser.avatar}" alt="avatar" class="profile-avatar" onclick="showEditProfile()">
-                    <div class="profile-name">${currentUser.name}</div>
-                    <div class="profile-bio">${currentUser.bio || 'Нет описания'}</div>
-                    <button class="edit-profile-btn" onclick="showEditProfile()">Ред.</button>
-                </div>
-                <div id="editProfileForm" class="edit-profile-form">
-                    <input type="text" id="editName" placeholder="Имя" value="${currentUser.name}">
-                    <textarea id="editBio" placeholder="О себе">${currentUser.bio || ''}</textarea>
-                    <input type="text" id="editAvatar" placeholder="URL аватарки" value="${currentUser.avatar}">
-                    <button class="save-profile-btn" onclick="saveProfile()">Сохранить</button>
-                </div>
-            `;
-        }
-
-        function showEditProfile() {
-            document.getElementById('editProfileForm').classList.add('active');
-        }
-
-        function saveProfile() {
-            const name = document.getElementById('editName').value;
-            const bio = document.getElementById('editBio').value;
-            const avatar = document.getElementById('editAvatar').value;
-
-            currentUser.name = name;
-            currentUser.bio = bio;
-            currentUser.avatar = avatar;
-
-            if (socket) {
-                socket.send(JSON.stringify({
-                    type: 'update_profile',
-                    name: name,
-                    bio: bio,
-                    avatar: avatar
-                }));
-            }
-
-            renderProfile();
-            document.getElementById('editProfileForm').classList.remove('active');
-            showNotification('Профиль обновлен', 'success');
-        }
-
-        function selectContact(contact) {
-            selectedContact = contact;
-            chatName.textContent = contact.name;
-            chatStatus.textContent = contact.status === 'online' ? 'в сети' : 'не в сети';
-            chatAvatar.src = contact.avatar || 'https://via.placeholder.com/40';
-            renderMessages();
-            renderContacts();
-        }
-
-        function addMessage(from, to, text, timestamp) {
-            if (!messages[to]) messages[to] = [];
-            messages[to].push({ from, text, timestamp: timestamp || new Date().toISOString() });
-            if (selectedContact && selectedContact.id === to) renderMessages();
-        }
-
-        function connect() {
-            const userId = prompt('Ваш ID:');
-            if (!userId) return;
-
-            currentUser.id = userId;
-            currentUser.name = userId;
-            currentUserId.textContent = userId;
-
-            const wsUrl = 'wss://my-messenger-xiic.onrender.com';
-            socket = new WebSocket(wsUrl);
-
-            socket.onopen = () => {
-                updateStatus(true);
-                socket.send(JSON.stringify({
-                    type: 'auth',
-                    userId: currentUser.id,
-                    bio: currentUser.bio,
-                    avatar: currentUser.avatar
-                }));
-            };
-
-            socket.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                console.log('Получено:', data);
-
-                switch (data.type) {
-                    case 'auth_success':
-                        showNotification('Добро пожаловать, ' + currentUser.id, 'success');
-                        break;
-                    case 'friends_list':
-                        friends = data.friends || [];
-                        renderContacts();
-                        break;
-                    case 'friend_requests':
-                        friendRequests = data.requests || [];
-                        updateRequestsBadge();
-                        break;
-                    case 'friend_request':
-                        friendRequests.push({
-                            id: data.from,
-                            name: data.fromName || data.from,
-                            avatar: data.fromAvatar || 'https://via.placeholder.com/40'
-                        });
-                        updateRequestsBadge();
-                        showNotification(`Новая заявка от ${data.fromName || data.from}`, 'info');
-                        showFriendRequestModal(data.from, data.fromName || data.from, data.fromAvatar);
-                        break;
-                    case 'friend_request_accepted':
-                        showNotification(data.message, 'success');
-                        break;
-                    case 'message':
-                        addMessage(data.from, data.from, data.text, data.timestamp);
-                        if (!selectedContact || selectedContact.id !== data.from) {
-                            showNotification(`Новое сообщение от ${data.from}`, 'info');
-                        }
-                        break;
-                    case 'profile_info':
-                        // Временно убрано для простоты
-                        break;
-                    case 'friend_request_sent':
-                        showNotification(data.message, 'success');
-                        break;
-                    case 'error':
-                        showNotification('Ошибка: ' + data.message, 'error');
-                        break;
-                }
-            };
-
-            socket.onclose = () => {
-                updateStatus(false);
-                friends = [];
-                renderContacts();
-                showNotification('Соединение потеряно', 'error');
-            };
-        }
-
-        function disconnect() {
-            if (socket) {
-                socket.close();
-                socket = null;
-            }
-            updateStatus(false);
-            friends = [];
-            renderContacts();
-        }
-
-        // Обработчики событий
-        connectBtn.onclick = () => {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                disconnect();
-            } else {
-                connect();
-            }
-        };
-
-        sendBtn.onclick = () => {
-            const text = messageInput.value.trim();
-            if (!text || !selectedContact || !socket) return;
-            socket.send(JSON.stringify({ type: 'message', to: selectedContact.id, text }));
-            addMessage(currentUser.id, selectedContact.id, text);
-            messageInput.value = '';
-        };
-
-        messageInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendBtn.click();
-        });
-
-        showAddFriendModal.onclick = () => {
-            addFriendModal.classList.add('active');
-            friendIdInput.value = '';
-            friendIdInput.focus();
-        };
-
-        cancelAddFriend.onclick = () => {
-            addFriendModal.classList.remove('active');
-            friendIdInput.value = '';
-        };
-
-        confirmAddFriend.onclick = () => {
-            const friendId = friendIdInput.value.trim();
-            
-            if (!socket) {
-                showNotification('Сначала подключитесь!', 'error');
-                return;
-            }
-            if (!friendId) {
-                showNotification('Введите ID', 'error');
-                return;
-            }
-            if (friendId === currentUser.id) {
-                showNotification('Нельзя добавить себя', 'error');
-                return;
-            }
-            
-            socket.send(JSON.stringify({ type: 'add_friend', friendId }));
-            addFriendModal.classList.remove('active');
-            friendIdInput.value = '';
-            showNotification('Запрос отправлен', 'success');
-        };
-
-        searchContacts.addEventListener('input', renderContacts);
-
-        menuToggle.onclick = () => {
-            contactsSidebar.classList.toggle('active');
-            profileSidebarEl.classList.remove('active');
-        };
-
-        profileToggle.onclick = () => {
-            profileSidebarEl.classList.toggle('active');
-            contactsSidebar.classList.remove('active');
-        };
-
-        // Глобальные функции
-        window.showFriendProfile = () => {};
-        window.showEditProfile = showEditProfile;
-        window.saveProfile = saveProfile;
-        window.renderProfile = renderProfile;
-        window.showRequests = showRequests;
-        window.acceptRequest = acceptRequest;
-        window.declineRequest = declineRequest;
-        window.showFriendRequestModal = showFriendRequestModal;
-
-        // Инициализация
-        renderProfile();
-    </script>
-</body>
-</html>
 

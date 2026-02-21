@@ -240,6 +240,23 @@ wss.on('connection', (ws) => {
                         
                         db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [currentUser.userId]);
                         
+                        // Отправляем последние сообщения канала
+                        db.all(`SELECT * FROM channel_messages ORDER BY created_at ASC`, [], (err, messages) => {
+                            if (messages) {
+                                messages.forEach(msg => {
+                                    ws.send(JSON.stringify({
+                                        type: 'channel_message',
+                                        content: msg.content,
+                                        author: 'Clock Messenger',
+                                        timestamp: msg.created_at,
+                                        fileData: msg.file_data,
+                                        fileName: msg.file_name,
+                                        fileType: msg.file_type
+                                    }));
+                                });
+                            }
+                        });
+                        
                     } catch (e) {
                         ws.send(JSON.stringify({ type: 'auth_error', message: 'Неверный токен' }));
                     }
@@ -324,50 +341,34 @@ wss.on('connection', (ws) => {
                             const messageId = this.lastID;
                             console.log(`✅ Сообщение сохранено в канал, ID: ${messageId}`);
                             
-                            // Получаем всех подписчиков
-                            db.all(`SELECT user_id FROM channel_subscribers`, [], (err, subscribers) => {
-                                if (err) {
-                                    console.error('❌ Ошибка получения подписчиков:', err);
-                                    return;
+                            const message = {
+                                type: 'channel_message',
+                                content: content,
+                                author: 'Clock Messenger',
+                                timestamp: new Date().toISOString(),
+                                messageId: messageId
+                            };
+                            
+                            if (channelFile) {
+                                message.fileData = channelFile;
+                                message.fileName = channelFileName;
+                                message.fileType = channelFileType;
+                            }
+                            
+                            // Рассылаем ВСЕМ подписчикам
+                            clients.forEach((client, userId) => {
+                                if (client && client.readyState === WebSocket.OPEN) {
+                                    client.send(JSON.stringify(message));
+                                    console.log(`📢 Отправлено пользователю ${userId}`);
                                 }
-                                
-                                console.log(`📢 Отправка сообщения ${subscribers.length} подписчикам`);
-                                
-                                const message = {
-                                    type: 'channel_message',
-                                    content: content,
-                                    author: 'Clock Messenger',
-                                    timestamp: new Date().toISOString(),
-                                    messageId: messageId
-                                };
-                                
-                                if (channelFile) {
-                                    message.fileData = channelFile;
-                                    message.fileName = channelFileName;
-                                    message.fileType = channelFileType;
-                                }
-                                
-                                // Рассылаем ВСЕМ подписчикам
-                                let sentCount = 0;
-                                subscribers.forEach(sub => {
-                                    const subscriberWs = clients.get(sub.user_id);
-                                    if (subscriberWs && subscriberWs.readyState === WebSocket.OPEN) {
-                                        subscriberWs.send(JSON.stringify(message));
-                                        sentCount++;
-                                    } else {
-                                        console.log(`😴 Подписчик ${sub.user_id} не в сети`);
-                                    }
-                                });
-                                
-                                console.log(`✅ Сообщение отправлено ${sentCount} подписчикам`);
-                                
-                                // Отправляем подтверждение админу
-                                ws.send(JSON.stringify({
-                                    type: 'channel_message_sent',
-                                    messageId: messageId,
-                                    content: content
-                                }));
                             });
+                            
+                            // Отправляем подтверждение админу
+                            ws.send(JSON.stringify({
+                                type: 'channel_message_sent',
+                                messageId: messageId,
+                                content: content
+                            }));
                         }
                     );
                     break;
@@ -480,7 +481,6 @@ wss.on('connection', (ws) => {
                     
                     const { chatId } = data;
                     
-                    // Удаляем сообщения из базы данных
                     db.run(`DELETE FROM messages WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)`,
                         [currentUser.userId, chatId, chatId, currentUser.userId], function(err) {
                             if (!err) {
@@ -514,15 +514,12 @@ wss.on('connection', (ws) => {
                             console.log('✅ Канал очищен');
                             
                             // Уведомляем всех подписчиков
-                            db.all(`SELECT user_id FROM channel_subscribers`, [], (err, subscribers) => {
-                                subscribers.forEach(sub => {
-                                    const subscriberWs = clients.get(sub.user_id);
-                                    if (subscriberWs && subscriberWs.readyState === WebSocket.OPEN) {
-                                        subscriberWs.send(JSON.stringify({
-                                            type: 'channel_cleared'
-                                        }));
-                                    }
-                                });
+                            clients.forEach((client, userId) => {
+                                if (client && client.readyState === WebSocket.OPEN) {
+                                    client.send(JSON.stringify({
+                                        type: 'channel_cleared'
+                                    }));
+                                }
                             });
                         }
                     });
@@ -555,8 +552,108 @@ wss.on('connection', (ws) => {
                     }
                     break;
 
+                case 'create_group':
+                    if (!currentUser) break;
+                    
+                    const { group } = data;
+                    
+                    // Сохраняем группу в памяти (в реальном проекте нужно в БД)
+                    groups.push(group);
+                    
+                    // Уведомляем всех участников
+                    group.members.forEach(memberId => {
+                        const memberWs = clients.get(memberId);
+                        if (memberWs) {
+                            memberWs.send(JSON.stringify({
+                                type: 'group_created',
+                                group: group
+                            }));
+                        }
+                    });
+                    break;
+
+                case 'add_to_group':
+                    if (!currentUser) break;
+                    
+                    const { groupId, members } = data;
+                    
+                    // Уведомляем новых участников
+                    members.forEach(memberId => {
+                        const memberWs = clients.get(memberId);
+                        if (memberWs) {
+                            memberWs.send(JSON.stringify({
+                                type: 'group_members_added',
+                                groupId: groupId,
+                                members: members
+                            }));
+                        }
+                    });
+                    break;
+
+                case 'kick_from_group':
+                    if (!currentUser) break;
+                    
+                    const { groupId: kickGroupId, memberId } = data;
+                    
+                    // Уведомляем исключённого
+                    const kickedWs = clients.get(memberId);
+                    if (kickedWs) {
+                        kickedWs.send(JSON.stringify({
+                            type: 'member_kicked',
+                            groupId: kickGroupId,
+                            memberId: memberId
+                        }));
+                    }
+                    break;
+
+                case 'delete_group':
+                    if (!currentUser) break;
+                    
+                    const { groupId: deleteGroupId } = data;
+                    
+                    // Уведомляем всех участников
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                type: 'group_deleted',
+                                groupId: deleteGroupId
+                            }));
+                        }
+                    });
+                    break;
+
+                case 'leave_group':
+                    if (!currentUser) break;
+                    
+                    const { groupId: leaveGroupId } = data;
+                    
+                    // Уведомляем остальных участников
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN && userId !== currentUser.userId) {
+                            client.send(JSON.stringify({
+                                type: 'member_kicked',
+                                groupId: leaveGroupId,
+                                memberId: currentUser.userId
+                            }));
+                        }
+                    });
+                    break;
+
                 case 'reaction':
-                    // Здесь будет логика реакций
+                    // Рассылаем реакцию всем в чате
+                    const { chatId, messageId, reaction } = data;
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                type: 'reaction',
+                                chatId: chatId,
+                                messageId: messageId,
+                                reaction: reaction,
+                                userId: currentUser?.userId
+                            }));
+                        }
+                    });
                     break;
             }
         } catch (e) {

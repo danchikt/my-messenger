@@ -578,23 +578,23 @@ wss.on('connection', (ws) => {
                 case 'clear_chat':
                     if (!currentUser) break;
                     
-                    const { chatId } = data;
+                    const { chatId: clearChatId } = data;
                     
                     db.run(`DELETE FROM messages WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)`,
-                        [currentUser.userId, chatId, chatId, currentUser.userId], function(err) {
+                        [currentUser.userId, clearChatId, clearChatId, currentUser.userId], function(err) {
                             if (!err) {
-                                const targetSocket = clients.get(chatId);
+                                const targetSocket = clients.get(clearChatId);
                                 if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
                                     targetSocket.send(JSON.stringify({
                                         type: 'chat_cleared',
-                                        chatId: chatId,
+                                        chatId: clearChatId,
                                         by: currentUser.userId
                                     }));
                                 }
                                 
                                 ws.send(JSON.stringify({
                                     type: 'chat_cleared',
-                                    chatId: chatId,
+                                    chatId: clearChatId,
                                     by: currentUser.userId
                                 }));
                             }
@@ -748,14 +748,14 @@ wss.on('connection', (ws) => {
                 case 'reaction':
                     if (!currentUser) break;
                     
-                    const { chatId, messageId, reaction, remove } = data;
+                    const { chatId: reactionChatId, messageId: reactionMessageId, reaction, remove } = data;
                     
                     if (remove) {
                         db.run(`DELETE FROM reactions WHERE user_id = ? AND message_id = ?`,
-                            [currentUser.userId, messageId]);
+                            [currentUser.userId, reactionMessageId]);
                     } else {
                         db.run(`INSERT OR REPLACE INTO reactions (user_id, message_id, reaction) VALUES (?, ?, ?)`,
-                            [currentUser.userId, messageId, reaction]);
+                            [currentUser.userId, reactionMessageId, reaction]);
                     }
                     
                     // Рассылаем всем в чате
@@ -763,8 +763,8 @@ wss.on('connection', (ws) => {
                         if (client && client.readyState === WebSocket.OPEN) {
                             client.send(JSON.stringify({
                                 type: 'reaction',
-                                chatId: chatId,
-                                messageId: messageId,
+                                chatId: reactionChatId,
+                                messageId: reactionMessageId,
                                 reaction: reaction,
                                 userId: currentUser.userId,
                                 remove: remove

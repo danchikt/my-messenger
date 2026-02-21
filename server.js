@@ -1,221 +1,340 @@
-// Подключаем библиотеки
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
 const path = require('path');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const { 
+    db, 
+    createUser, 
+    findUser, 
+    verifyPassword,
+    getUserContacts,
+    subscribeToChannel,
+    getChannelMessages,
+    addChannelMessage 
+} = require('./database');
 
-// Создаем веб-сервер
 const app = express();
 const server = http.createServer(app);
-
-// Создаем сервер WebSockets
 const wss = new WebSocket.Server({ server });
 
-// Хранилище подключений: id пользователя -> WebSocket
+// Настройки
+const JWT_SECRET = 'your-secret-key-change-this'; // В продакшене смени на случайную строку
+const ADMIN_EMAIL = 'loling601@gmail.com';
+const ADMIN_ID = 'admin';
+
+// Middleware
+app.use(cors());
+app.use(express.json());
+
+// Хранилище активных WebSocket соединений
 const clients = new Map();
 
-// Хранилище друзей (в реальном проекте здесь будет база данных)
-// Формат: { userId: [список друзей] }
-const friendships = {};
+// ========== HTTP ЭНДПОИНТЫ (для регистрации/входа) ==========
 
-// Это событие срабатывает, когда кто-то подключается
-wss.on('connection', (ws) => {
-    console.log('✅ Новый клиент подключился');
+// Регистрация
+app.post('/api/register', async (req, res) => {
+    const { email, username, password, name, bio, phone } = req.body;
     
-    let userId = null;
+    if (!email || !username || !password) {
+        return res.status(400).json({ error: 'Email, username и password обязательны' });
+    }
+    
+    // Генерируем ID из username
+    const userId = username.toLowerCase();
+    
+    try {
+        createUser({
+            id: userId,
+            name: name || username,
+            email,
+            username,
+            password,
+            bio: bio || '',
+            phone
+        }, (err, user) => {
+            if (err) {
+                if (err.message.includes('UNIQUE')) {
+                    return res.status(400).json({ error: 'Email или username уже заняты' });
+                }
+                return res.status(500).json({ error: 'Ошибка базы данных' });
+            }
+            
+            // Создаём JWT токен
+            const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET);
+            
+            res.json({ 
+                success: true, 
+                token,
+                user: {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email
+                }
+            });
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Ошибка сервера' });
+    }
+});
 
-    // Обработка входящих сообщений
-    ws.on('message', (message) => {
+// Вход
+app.post('/api/login', (req, res) => {
+    const { login, password } = req.body;
+    
+    if (!login || !password) {
+        return res.status(400).json({ error: 'Логин и пароль обязательны' });
+    }
+    
+    findUser(login, async (err, user) => {
+        if (err || !user) {
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
+        
+        const isValid = await verifyPassword(password, user.password_hash);
+        if (!isValid) {
+            return res.status(401).json({ error: 'Неверный логин или пароль' });
+        }
+        
+        const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET);
+        
+        res.json({
+            success: true,
+            token,
+            user: {
+                id: user.id,
+                username: user.username,
+                name: user.name,
+                email: user.email,
+                bio: user.bio,
+                avatar: user.avatar
+            }
+        });
+    });
+});
+
+// Получить сообщения канала
+app.get('/api/channel/messages', (req, res) => {
+    getChannelMessages(50, (err, messages) => {
+        if (err) {
+            return res.status(500).json({ error: 'Ошибка базы данных' });
+        }
+        res.json(messages);
+    });
+});
+
+// ========== WEBSOCKET (основная логика) ==========
+
+wss.on('connection', (ws) => {
+    console.log('✅ Новый WebSocket клиент');
+    let currentUser = null;
+
+    ws.on('message', async (message) => {
         try {
             const data = JSON.parse(message);
-            console.log('📨 Получено сообщение:', data);
+            console.log('📨 Получено:', data.type);
 
             switch (data.type) {
-                // ===== АВТОРИЗАЦИЯ =====
+                // ===== АВТОРИЗАЦИЯ ПО ТОКЕНУ =====
                 case 'auth':
-                    userId = data.userId;
-                    clients.set(userId, ws);
-                    console.log(`👤 Пользователь ${userId} авторизован`);
+                    const { token } = data;
                     
-                    // Отправляем подтверждение
-                    ws.send(JSON.stringify({ 
-                        type: 'auth_success', 
-                        userId: userId 
-                    }));
-                    
-                    // Отправляем список друзей (если есть)
-                    if (friendships[userId]) {
-                        const friendsList = friendships[userId].map(friendId => ({
-                            id: friendId,
-                            name: friendId,
-                            status: clients.has(friendId) ? 'online' : 'offline'
-                        }));
+                    try {
+                        const decoded = jwt.verify(token, JWT_SECRET);
+                        currentUser = decoded;
                         
-                        ws.send(JSON.stringify({
-                            type: 'friends_list',
-                            friends: friendsList
-                        }));
+                        // Сохраняем соединение
+                        clients.set(currentUser.userId, ws);
+                        
+                        // Обновляем статус в базе
+                        db.run(`UPDATE users SET status = 'online' WHERE id = ?`, [currentUser.userId]);
+                        
+                        // Получаем контакты
+                        getUserContacts(currentUser.userId, (err, contacts) => {
+                            ws.send(JSON.stringify({
+                                type: 'auth_success',
+                                user: currentUser,
+                                contacts: contacts || []
+                            }));
+                        });
+                        
+                        // Подписываем на канал (если ещё нет)
+                        subscribeToChannel(currentUser.userId, () => {});
+                        
+                    } catch (e) {
+                        ws.send(JSON.stringify({ type: 'auth_error', message: 'Неверный токен' }));
                     }
                     break;
 
                 // ===== ОТПРАВКА СООБЩЕНИЯ =====
                 case 'message':
+                    if (!currentUser) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Не авторизован' }));
+                        break;
+                    }
+                    
                     const { to, text } = data;
                     
-                    const targetSocket = clients.get(to);
+                    // Сохраняем в базу
+                    db.run(`INSERT INTO messages (from_id, to_id, text) VALUES (?, ?, ?)`,
+                        [currentUser.userId, to, text]);
                     
+                    // Отправляем получателю, если онлайн
+                    const targetSocket = clients.get(to);
                     if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
                         targetSocket.send(JSON.stringify({
                             type: 'message',
-                            from: userId,
+                            from: currentUser.userId,
+                            fromName: currentUser.username,
                             text: text,
                             timestamp: new Date().toISOString()
                         }));
-                        console.log(`✉️ Сообщение от ${userId} к ${to}: "${text}"`);
-                    } else {
-                        console.log(`😴 Пользователь ${to} не в сети`);
                     }
+                    break;
+
+                // ===== ОТПРАВКА В КАНАЛ (только для админа) =====
+                case 'channel_message':
+                    if (!currentUser) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Не авторизован' }));
+                        break;
+                    }
+                    
+                    // Проверяем, админ ли
+                    if (currentUser.userId !== ADMIN_ID) {
+                        ws.send(JSON.stringify({ type: 'error', message: 'Только администратор может писать в канал' }));
+                        break;
+                    }
+                    
+                    const { content } = data;
+                    
+                    // Сохраняем в базу
+                    addChannelMessage(content, currentUser.userId, 'Официальный канал', (err) => {
+                        if (err) {
+                            ws.send(JSON.stringify({ type: 'error', message: 'Ошибка сохранения' }));
+                            return;
+                        }
+                        
+                        // Рассылаем всем подписчикам онлайн
+                        db.all(`SELECT user_id FROM channel_subscribers`, [], (err, subscribers) => {
+                            subscribers.forEach(sub => {
+                                const subscriberWs = clients.get(sub.user_id);
+                                if (subscriberWs && subscriberWs.readyState === WebSocket.OPEN) {
+                                    subscriberWs.send(JSON.stringify({
+                                        type: 'channel_message',
+                                        content: content,
+                                        author: 'Официальный канал',
+                                        timestamp: new Date().toISOString()
+                                    }));
+                                }
+                            });
+                        });
+                    });
                     break;
 
                 // ===== ДОБАВЛЕНИЕ В ДРУЗЬЯ =====
                 case 'add_friend':
-                    console.log('\n=== ПОЛУЧЕН ЗАПРОС ADD_FRIEND ===');
-                    console.log('От пользователя:', userId);
+                    if (!currentUser) break;
                     
                     const { friendId } = data;
-                    console.log('ID друга для добавления:', friendId);
                     
-                    if (!friendId) {
-                        console.log('❌ Ошибка: нет ID друга');
-                        break;
-                    }
-                    
-                    if (friendId === userId) {
-                        ws.send(JSON.stringify({
-                            type: 'error',
-                            message: 'Нельзя добавить самого себя'
-                        }));
-                        break;
-                    }
-                    
-                    const friendSocket = clients.get(friendId);
-                    
-                    if (friendSocket && friendSocket.readyState === WebSocket.OPEN) {
-                        console.log(`👤 Друг ${friendId} онлайн, отправляем уведомление`);
-                        
-                        friendSocket.send(JSON.stringify({
-                            type: 'friend_request',
-                            from: userId,
-                            fromName: userId,
-                            message: `Пользователь ${userId} хочет добавить вас в друзья`
-                        }));
-                        
-                        ws.send(JSON.stringify({
-                            type: 'friend_request_sent',
-                            to: friendId,
-                            message: `Запрос отправлен пользователю ${friendId}`
-                        }));
-                    } else {
-                        console.log(`💤 Друг ${friendId} не в сети`);
-                        ws.send(JSON.stringify({
-                            type: 'error',
-                            message: 'Пользователь не в сети или не существует'
-                        }));
-                    }
+                    // Проверяем, существует ли пользователь
+                    db.get(`SELECT id, name, username FROM users WHERE id = ? OR username = ?`, 
+                        [friendId, friendId], (err, friend) => {
+                            if (!friend) {
+                                ws.send(JSON.stringify({ type: 'error', message: 'Пользователь не найден' }));
+                                return;
+                            }
+                            
+                            // Создаём заявку
+                            db.run(`INSERT INTO friends (user_id, friend_id, status) VALUES (?, ?, 'pending')`,
+                                [currentUser.userId, friend.id], (err) => {
+                                    if (err) {
+                                        ws.send(JSON.stringify({ type: 'error', message: 'Заявка уже существует' }));
+                                        return;
+                                    }
+                                    
+                                    // Уведомляем друга, если онлайн
+                                    const friendWs = clients.get(friend.id);
+                                    if (friendWs) {
+                                        friendWs.send(JSON.stringify({
+                                            type: 'friend_request',
+                                            from: currentUser.userId,
+                                            fromName: currentUser.username
+                                        }));
+                                    }
+                                    
+                                    ws.send(JSON.stringify({ 
+                                        type: 'friend_request_sent', 
+                                        to: friend.id 
+                                    }));
+                                });
+                        });
                     break;
 
                 // ===== ПРИНЯТЬ ЗАЯВКУ =====
                 case 'accept_friend':
+                    if (!currentUser) break;
+                    
                     const { requesterId } = data;
-                    console.log(`✅ Заявка принята: ${requesterId} -> ${userId}`);
                     
-                    // Сохраняем дружбу
-                    if (!friendships[userId]) friendships[userId] = [];
-                    if (!friendships[requesterId]) friendships[requesterId] = [];
-                    
-                    if (!friendships[userId].includes(requesterId)) {
-                        friendships[userId].push(requesterId);
-                    }
-                    if (!friendships[requesterId].includes(userId)) {
-                        friendships[requesterId].push(userId);
-                    }
-                    
-                    // Отправляем уведомление тому, кто отправил заявку
-                    const requesterSocket = clients.get(requesterId);
-                    if (requesterSocket) {
-                        requesterSocket.send(JSON.stringify({
-                            type: 'friend_request_accepted',
-                            by: userId,
-                            message: `Пользователь ${userId} принял вашу заявку`
-                        }));
-                        
-                        // Отправляем обновленный список друзей отправителю
-                        const requesterFriends = friendships[requesterId].map(friendId => ({
-                            id: friendId,
-                            name: friendId,
-                            status: clients.has(friendId) ? 'online' : 'offline'
-                        }));
-                        
-                        requesterSocket.send(JSON.stringify({
-                            type: 'friends_list',
-                            friends: requesterFriends
-                        }));
-                    }
-                    
-                    // Отправляем обновленный список друзей текущему пользователю
-                    const currentUserFriends = friendships[userId].map(friendId => ({
-                        id: friendId,
-                        name: friendId,
-                        status: clients.has(friendId) ? 'online' : 'offline'
-                    }));
-                    
-                    ws.send(JSON.stringify({
-                        type: 'friends_list',
-                        friends: currentUserFriends
-                    }));
-                    
-                    ws.send(JSON.stringify({
-                        type: 'notification',
-                        message: `Вы приняли заявку от ${requesterId}`
-                    }));
+                    db.run(`UPDATE friends SET status = 'accepted' 
+                            WHERE user_id = ? AND friend_id = ?`,
+                        [requesterId, currentUser.userId], function(err) {
+                            if (!err) {
+                                // Отправляем обновлённые списки обоим
+                                getUserContacts(currentUser.userId, (err, contacts) => {
+                                    ws.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
+                                });
+                                
+                                const requesterWs = clients.get(requesterId);
+                                if (requesterWs) {
+                                    getUserContacts(requesterId, (err, contacts) => {
+                                        requesterWs.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
+                                    });
+                                }
+                            }
+                        });
                     break;
 
-                // ===== ОТКЛОНИТЬ ЗАЯВКУ =====
-                case 'decline_friend':
-                    const { requesterId: declineId } = data;
-                    console.log(`❌ Заявка отклонена: ${declineId} -> ${userId}`);
+                // ===== ПОЛУЧИТЬ ПРОФИЛЬ =====
+                case 'get_profile':
+                    const { profileId } = data;
                     
-                    ws.send(JSON.stringify({
-                        type: 'notification',
-                        message: `Заявка от ${declineId} отклонена`
-                    }));
+                    db.get(`SELECT id, name, username, bio, avatar, status FROM users WHERE id = ?`,
+                        [profileId], (err, profile) => {
+                            if (profile) {
+                                ws.send(JSON.stringify({
+                                    type: 'profile_info',
+                                    profile: profile
+                                }));
+                            }
+                        });
                     break;
-
-                default:
-                    console.log('❌ Неизвестный тип сообщения:', data.type);
             }
         } catch (e) {
-            console.log('❌ Ошибка обработки сообщения:', e);
+            console.log('❌ Ошибка:', e);
         }
     });
 
-    // Обработка отключения
     ws.on('close', () => {
-        if (userId) {
-            clients.delete(userId);
-            console.log(`👋 Пользователь ${userId} отключился`);
+        if (currentUser) {
+            clients.delete(currentUser.userId);
+            db.run(`UPDATE users SET status = 'offline' WHERE id = ?`, [currentUser.userId]);
+            console.log(`👋 ${currentUser.username} отключился`);
         }
     });
 });
 
-// Отдаем HTML файл
+// Отдаём HTML
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Запускаем сервер
+// Запуск сервера
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Сервер запущен на порту ${PORT}`);
-    console.log(`🔌 WebSocket сервер работает`);
+    console.log(`📝 Регистрация: http://localhost:${PORT}/api/register`);
+    console.log(`🔑 Вход: http://localhost:${PORT}/api/login`);
 });

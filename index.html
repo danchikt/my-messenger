@@ -507,7 +507,542 @@
                 opacity: 1;
             }
         }
+
+        .notification.success {
+            border-left-color: var(--success);
+        }
+
+        .notification.error {
+            border-left-color: var(--error);
+        }
+
+        .hidden {
+            display: none;
+        }
     </style>
 </head>
+<body>
+    <div class="app-container">
+        <!-- Статус бар -->
+        <div class="status-bar">
+            <div id="statusDisplay" class="status-disconnected">🔴 Не подключено</div>
+            <div id="authContainer">
+                <button id="authButton" class="auth-button">Войти</button>
+                <div id="userInfo" class="user-info hidden">
+                    <div id="userAvatar" class="user-avatar-small">?</div>
+                    <span id="userName"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Основной контент -->
+        <div id="authScreen" class="main-content">
+            <div class="auth-screen">
+                <div class="auth-form">
+                    <div class="auth-tabs">
+                        <button id="loginTab" class="auth-tab active">Вход</button>
+                        <button id="registerTab" class="auth-tab">Регистрация</button>
+                    </div>
+                    
+                    <div id="loginForm">
+                        <input type="text" id="loginEmail" class="auth-input" placeholder="Email или username">
+                        <input type="password" id="loginPassword" class="auth-input" placeholder="Пароль">
+                        <button id="loginSubmit" class="auth-submit">Войти</button>
+                    </div>
+                    
+                    <div id="registerForm" class="hidden">
+                        <input type="email" id="registerEmail" class="auth-input" placeholder="Email">
+                        <input type="text" id="registerUsername" class="auth-input" placeholder="Username">
+                        <input type="password" id="registerPassword" class="auth-input" placeholder="Пароль">
+                        <input type="text" id="registerName" class="auth-input" placeholder="Имя (необязательно)">
+                        <input type="text" id="registerBio" class="auth-input" placeholder="О себе (необязательно)">
+                        <button id="registerSubmit" class="auth-submit">Зарегистрироваться</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="contactsScreen" class="main-content">
+            <div class="contacts-screen">
+                <div class="search-bar">
+                    <span>🔍</span>
+                    <input type="text" id="searchContacts" placeholder="Поиск контактов...">
+                    <button id="addFriendBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">➕</button>
+                </div>
+                <div id="contactsList" class="contacts-list">
+                    <!-- Контакты будут здесь -->
+                </div>
+            </div>
+        </div>
+
+        <div id="chatsScreen" class="main-content">
+            <div class="chats-screen">
+                <div id="chatsList" class="chats-list">
+                    <!-- Чаты будут здесь -->
+                </div>
+            </div>
+        </div>
+
+        <div id="profileScreen" class="main-content">
+            <div class="profile-screen">
+                <div class="profile-header">
+                    <div class="profile-avatar-large" id="profileAvatar">
+                        ?
+                        <div class="avatar-overlay" id="editAvatarBtn">📷</div>
+                    </div>
+                    <div class="profile-name" id="profileName"></div>
+                    <div class="profile-username" id="profileUsername"></div>
+                    <div class="profile-bio" id="profileBio"></div>
+                    <button id="editProfileBtn" class="auth-button">Редактировать профиль</button>
+                </div>
+                <div class="profile-stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="contactsCount">0</div>
+                        <div class="stat-label">контактов</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="channelsCount">1</div>
+                        <div class="stat-label">канал</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="channelScreen" class="main-content">
+            <div class="channel-screen">
+                <div class="channel-header">
+                    <h2>📢 Официальный канал</h2>
+                    <span class="channel-badge">✅ Официальный</span>
+                </div>
+                <div id="channelMessages" style="flex: 1; overflow-y: auto; margin-bottom: 12px;">
+                    <!-- Сообщения канала -->
+                </div>
+                <div id="channelInputArea" class="hidden" style="display: flex; gap: 8px; padding: 8px 0;">
+                    <input type="text" id="channelInput" class="auth-input" placeholder="Написать в канал..." style="margin: 0;">
+                    <button id="sendChannelBtn" class="auth-submit" style="width: auto; padding: 0 20px; margin: 0;">➤</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Нижние табы -->
+        <div class="bottom-tabs">
+            <button class="tab-button active" data-tab="contacts">👥 Контакты</button>
+            <button class="tab-button" data-tab="chats">💬 Чаты</button>
+            <button class="tab-button" data-tab="profile">👤 Профиль</button>
+            <button class="tab-button" data-tab="channel">📢 Канал</button>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div id="addFriendModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Добавить друга</div>
+            <input type="text" id="addFriendInput" class="modal-input" placeholder="Введите ID или @username">
+            <div class="modal-buttons">
+                <button id="addFriendCancel" class="modal-button modal-button-secondary">Отмена</button>
+                <button id="addFriendConfirm" class="modal-button modal-button-primary">Добавить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editProfileModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Редактировать профиль</div>
+            <input type="text" id="editName" class="modal-input" placeholder="Имя">
+            <input type="text" id="editBio" class="modal-input" placeholder="О себе">
+            <input type="file" id="editAvatarFile" accept="image/*" class="modal-input" style="padding: 8px;">
+            <div class="modal-buttons">
+                <button id="editProfileCancel" class="modal-button modal-button-secondary">Отмена</button>
+                <button id="editProfileConfirm" class="modal-button modal-button-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Уведомления -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <script>
+        // ========== СОСТОЯНИЕ ==========
+        let token = localStorage.getItem('token');
+        let currentUser = null;
+        let contacts = [];
+        let channelMessages = [];
+        let socket = null;
+        let currentTab = 'contacts';
+
+        // ========== DOM ЭЛЕМЕНТЫ ==========
+        const statusEl = document.getElementById('statusDisplay');
+        const authButton = document.getElementById('authButton');
+        const userInfo = document.getElementById('userInfo');
+        const userName = document.getElementById('userName');
+        const userAvatar = document.getElementById('userAvatar');
+        
+        const authScreen = document.getElementById('authScreen');
+        const contactsScreen = document.getElementById('contactsScreen');
+        const chatsScreen = document.getElementById('chatsScreen');
+        const profileScreen = document.getElementById('profileScreen');
+        const channelScreen = document.getElementById('channelScreen');
+        
+        const tabButtons = document.querySelectorAll('.tab-button');
+        
+        // Формы
+        const loginTab = document.getElementById('loginTab');
+        const registerTab = document.getElementById('registerTab');
+        const loginForm = document.getElementById('loginForm');
+        const registerForm = document.getElementById('registerForm');
+        
+        const loginEmail = document.getElementById('loginEmail');
+        const loginPassword = document.getElementById('loginPassword');
+        const loginSubmit = document.getElementById('loginSubmit');
+        
+        const registerEmail = document.getElementById('registerEmail');
+        const registerUsername = document.getElementById('registerUsername');
+        const registerPassword = document.getElementById('registerPassword');
+        const registerName = document.getElementById('registerName');
+        const registerBio = document.getElementById('registerBio');
+        const registerSubmit = document.getElementById('registerSubmit');
+        
+        // Контакты
+        const contactsList = document.getElementById('contactsList');
+        const searchContacts = document.getElementById('searchContacts');
+        const addFriendBtn = document.getElementById('addFriendBtn');
+        
+        // Профиль
+        const profileAvatar = document.getElementById('profileAvatar');
+        const profileName = document.getElementById('profileName');
+        const profileUsername = document.getElementById('profileUsername');
+        const profileBio = document.getElementById('profileBio');
+        const contactsCount = document.getElementById('contactsCount');
+        const channelsCount = document.getElementById('channelsCount');
+        const editProfileBtn = document.getElementById('editProfileBtn');
+        
+        // Канал
+        const channelMessagesList = document.getElementById('channelMessages');
+        const channelInput = document.getElementById('channelInput');
+        const sendChannelBtn = document.getElementById('sendChannelBtn');
+        const channelInputArea = document.getElementById('channelInputArea');
+        
+        // Модальные окна
+        const addFriendModal = document.getElementById('addFriendModal');
+        const addFriendInput = document.getElementById('addFriendInput');
+        const addFriendConfirm = document.getElementById('addFriendConfirm');
+        const addFriendCancel = document.getElementById('addFriendCancel');
+        
+        const editProfileModal = document.getElementById('editProfileModal');
+        const editName = document.getElementById('editName');
+        const editBio = document.getElementById('editBio');
+        const editAvatarFile = document.getElementById('editAvatarFile');
+        const editProfileConfirm = document.getElementById('editProfileConfirm');
+        const editProfileCancel = document.getElementById('editProfileCancel');
+
+        // ========== УТИЛИТЫ ==========
+        function showNotification(message, type = 'info') {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>${message}</span>
+                    <span onclick="this.parentElement.parentElement.remove()" style="cursor: pointer;">✕</span>
+                </div>
+            `;
+            container.appendChild(notification);
+            setTimeout(() => notification.remove(), 4000);
+        }
+
+        function getInitials(name) {
+            if (!name) return '?';
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        function formatTime(timestamp) {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+        }
+
+        // ========== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ==========
+        function showScreen(screenName) {
+            authScreen.classList.remove('active');
+            contactsScreen.classList.remove('active');
+            chatsScreen.classList.remove('active');
+            profileScreen.classList.remove('active');
+            channelScreen.classList.remove('active');
+            
+            tabButtons.forEach(btn => btn.classList.remove('active'));
+            
+            switch(screenName) {
+                case 'auth':
+                    authScreen.classList.add('active');
+                    break;
+                case 'contacts':
+                    contactsScreen.classList.add('active');
+                    document.querySelector('[data-tab="contacts"]').classList.add('active');
+                    break;
+                case 'chats':
+                    chatsScreen.classList.add('active');
+                    document.querySelector('[data-tab="chats"]').classList.add('active');
+                    break;
+                case 'profile':
+                    profileScreen.classList.add('active');
+                    document.querySelector('[data-tab="profile"]').classList.add('active');
+                    break;
+                case 'channel':
+                    channelScreen.classList.add('active');
+                    document.querySelector('[data-tab="channel"]').classList.add('active');
+                    break;
+            }
+            currentTab = screenName;
+        }
+
+        // ========== РАБОТА С API ==========
+        async function login(email, password) {
+            try {
+                const res = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ login: email, password })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    currentUser = data.user;
+                    updateUIForUser();
+                    connectWebSocket();
+                    showNotification('Вход выполнен', 'success');
+                } else {
+                    showNotification(data.error || 'Ошибка входа', 'error');
+                }
+            } catch (e) {
+                showNotification('Ошибка соединения', 'error');
+            }
+        }
+
+        async function register(email, username, password, name, bio) {
+            try {
+                const res = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, username, password, name, bio })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    token = data.token;
+                    localStorage.setItem('token', token);
+                    currentUser = data.user;
+                    updateUIForUser();
+                    connectWebSocket();
+                    showNotification('Регистрация успешна', 'success');
+                } else {
+                    showNotification(data.error || 'Ошибка регистрации', 'error');
+                }
+            } catch (e) {
+                showNotification('Ошибка соединения', 'error');
+            }
+        }
+
+        // ========== WEB SOCKET ==========
+        function connectWebSocket() {
+            const wsUrl = 'wss://' + window.location.host;
+            socket = new WebSocket(wsUrl);
+            
+            socket.onopen = () => {
+                statusEl.className = 'status-connected';
+                statusEl.innerHTML = '🟢 Подключено';
+                socket.send(JSON.stringify({ type: 'auth', token }));
+            };
+            
+            socket.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                console.log('📨', data);
+                
+                switch(data.type) {
+                    case 'auth_success':
+                        currentUser = { ...currentUser, ...data.user };
+                        contacts = data.contacts || [];
+                        updateContacts();
+                        showScreen('contacts');
+                        break;
+                        
+                    case 'friends_list':
+                        contacts = data.friends || [];
+                        updateContacts();
+                        break;
+                        
+                    case 'friend_request':
+                        showNotification(`Новая заявка от ${data.fromName}`, 'info');
+                        break;
+                        
+                    case 'friend_request_sent':
+                        showNotification(`Запрос отправлен ${data.to}`, 'success');
+                        break;
+                        
+                    case 'channel_message':
+                        addChannelMessageToUI(data);
+                        break;
+                        
+                    case 'error':
+                        showNotification(data.message, 'error');
+                        break;
+                }
+            };
+            
+            socket.onclose = () => {
+                statusEl.className = 'status-disconnected';
+                statusEl.innerHTML = '🔴 Не подключено';
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+
+        // ========== ОБНОВЛЕНИЕ ИНТЕРФЕЙСА ==========
+        function updateUIForUser() {
+            authButton.classList.add('hidden');
+            userInfo.classList.remove('hidden');
+            userName.textContent = currentUser.name || currentUser.username;
+            userAvatar.textContent = getInitials(currentUser.name || currentUser.username);
+            
+            // Профиль
+            profileName.textContent = currentUser.name || currentUser.username;
+            profileUsername.textContent = '@' + currentUser.username;
+            profileBio.textContent = currentUser.bio || 'Нет описания';
+            profileAvatar.textContent = getInitials(currentUser.name || currentUser.username);
+            
+            // Канал (показываем инпут только админу)
+            if (currentUser.id === 'admin') {
+                channelInputArea.classList.remove('hidden');
+            }
+        }
+
+        function updateContacts() {
+            const searchTerm = searchContacts?.value?.toLowerCase() || '';
+            const filtered = contacts.filter(c => 
+                (c.name || '').toLowerCase().includes(searchTerm) || 
+                (c.username || '').toLowerCase().includes(searchTerm)
+            );
+            
+            contactsList.innerHTML = '';
+            filtered.forEach(contact => {
+                const el = document.createElement('div');
+                el.className = 'contact-item';
+                el.innerHTML = `
+                    <div class="contact-avatar">${getInitials(contact.name || contact.username)}</div>
+                    <div class="contact-info">
+                        <div class="contact-name">${contact.name || contact.username}</div>
+                        <div class="contact-status">${contact.status === 'online' ? '🟢 в сети' : '⚫ не в сети'}</div>
+                    </div>
+                `;
+                el.onclick = () => openChat(contact);
+                contactsList.appendChild(el);
+            });
+            
+            contactsCount.textContent = filtered.length;
+        }
+
+        function addChannelMessageToUI(msg) {
+            const el = document.createElement('div');
+            el.className = 'channel-message';
+            el.innerHTML = `
+                <div class="channel-message-author">${msg.author || 'Официальный канал'}</div>
+                <div>${msg.content}</div>
+                <div class="channel-message-time">${formatTime(msg.timestamp)}</div>
+            `;
+            channelMessagesList.appendChild(el);
+            channelMessagesList.scrollTop = channelMessagesList.scrollHeight;
+        }
+
+        // ========== ОБРАБОТЧИКИ ==========
+        authButton.onclick = () => showScreen('auth');
+        
+        loginTab.onclick = () => {
+            loginTab.classList.add('active');
+            registerTab.classList.remove('active');
+            loginForm.classList.remove('hidden');
+            registerForm.classList.add('hidden');
+        };
+        
+        registerTab.onclick = () => {
+            registerTab.classList.add('active');
+            loginTab.classList.remove('active');
+            registerForm.classList.remove('hidden');
+            loginForm.classList.add('hidden');
+        };
+        
+        loginSubmit.onclick = () => login(loginEmail.value, loginPassword.value);
+        
+        registerSubmit.onclick = () => register(
+            registerEmail.value,
+            registerUsername.value,
+            registerPassword.value,
+            registerName.value,
+            registerBio.value
+        );
+        
+        addFriendBtn.onclick = () => addFriendModal.classList.add('active');
+        
+        addFriendCancel.onclick = () => {
+            addFriendModal.classList.remove('active');
+            addFriendInput.value = '';
+        };
+        
+        addFriendConfirm.onclick = () => {
+            if (socket && addFriendInput.value) {
+                socket.send(JSON.stringify({
+                    type: 'add_friend',
+                    friendId: addFriendInput.value
+                }));
+                addFriendModal.classList.remove('active');
+                addFriendInput.value = '';
+            }
+        };
+        
+        editProfileBtn.onclick = () => {
+            editName.value = currentUser.name || '';
+            editBio.value = currentUser.bio || '';
+            editProfileModal.classList.add('active');
+        };
+        
+        editProfileCancel.onclick = () => editProfileModal.classList.remove('active');
+        
+        editProfileConfirm.onclick = () => {
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'update_profile',
+                    name: editName.value,
+                    bio: editBio.value
+                }));
+                currentUser.name = editName.value;
+                currentUser.bio = editBio.value;
+                updateUIForUser();
+            }
+            editProfileModal.classList.remove('active');
+        };
+        
+        sendChannelBtn.onclick = () => {
+            if (socket && channelInput.value) {
+                socket.send(JSON.stringify({
+                    type: 'channel_message',
+                    content: channelInput.value
+                }));
+                channelInput.value = '';
+            }
+        };
+        
+        searchContacts?.addEventListener('input', updateContacts);
+        
+        tabButtons.forEach(btn => {
+            btn.onclick = () => showScreen(btn.dataset.tab);
+        });
+
+        // ========== ИНИЦИАЛИЗАЦИЯ ==========
+        if (token) {
+            connectWebSocket();
+            showScreen('contacts');
+        } else {
+            showScreen('auth');
+        }
+    </script>
+</body>
+</html>
+
 
 

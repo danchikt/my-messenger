@@ -354,6 +354,8 @@ wss.on('connection', (ws) => {
                                     if (subscriberWs && subscriberWs.readyState === WebSocket.OPEN) {
                                         subscriberWs.send(JSON.stringify(message));
                                         sentCount++;
+                                    } else {
+                                        console.log(`😴 Подписчик ${sub.user_id} не в сети`);
                                     }
                                 });
                                 
@@ -473,6 +475,59 @@ wss.on('connection', (ws) => {
                     }
                     break;
 
+                case 'clear_chat':
+                    if (!currentUser) break;
+                    
+                    const { chatId } = data;
+                    
+                    // Удаляем сообщения из базы данных
+                    db.run(`DELETE FROM messages WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)`,
+                        [currentUser.userId, chatId, chatId, currentUser.userId], function(err) {
+                            if (!err) {
+                                console.log(`✅ Чат ${chatId} очищен от сообщений`);
+                                
+                                // Отправляем уведомление об очистке обоим пользователям
+                                const targetSocket = clients.get(chatId);
+                                if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
+                                    targetSocket.send(JSON.stringify({
+                                        type: 'chat_cleared',
+                                        chatId: chatId,
+                                        by: currentUser.userId
+                                    }));
+                                }
+                                
+                                // Отправляем подтверждение инициатору
+                                ws.send(JSON.stringify({
+                                    type: 'chat_cleared',
+                                    chatId: chatId,
+                                    by: currentUser.userId
+                                }));
+                            }
+                        });
+                    break;
+
+                case 'clear_channel':
+                    if (!currentUser || currentUser.userId !== ADMIN_ID) break;
+                    
+                    db.run(`DELETE FROM channel_messages`, function(err) {
+                        if (!err) {
+                            console.log('✅ Канал очищен');
+                            
+                            // Уведомляем всех подписчиков
+                            db.all(`SELECT user_id FROM channel_subscribers`, [], (err, subscribers) => {
+                                subscribers.forEach(sub => {
+                                    const subscriberWs = clients.get(sub.user_id);
+                                    if (subscriberWs && subscriberWs.readyState === WebSocket.OPEN) {
+                                        subscriberWs.send(JSON.stringify({
+                                            type: 'channel_cleared'
+                                        }));
+                                    }
+                                });
+                            });
+                        }
+                    });
+                    break;
+
                 case 'update_profile':
                     if (!currentUser) break;
                     
@@ -501,7 +556,7 @@ wss.on('connection', (ws) => {
                     break;
 
                 case 'reaction':
-                    // Здесь будет логика реакций (для будущего обновления)
+                    // Здесь будет логика реакций
                     break;
             }
         } catch (e) {

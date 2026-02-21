@@ -307,6 +307,15 @@
             font-size: 14px;
         }
 
+        .admin-badge {
+            background: var(--primary);
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            margin-left: 4px;
+        }
+
         .blocked-badge {
             color: var(--error);
             font-size: 12px;
@@ -318,6 +327,15 @@
 
         .group-badge {
             background: var(--secondary);
+            color: white;
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            margin-left: 8px;
+        }
+
+        .channel-badge {
+            background: var(--primary);
             color: white;
             font-size: 12px;
             padding: 2px 8px;
@@ -1214,6 +1232,10 @@
         let selectedContactsForGroup = [];
         let selectedMessageId = null;
 
+        // ID канала (фиксированный)
+        const CHANNEL_ID = 'channel_clock';
+        const ADMIN_ID = 'admin';
+
         // ========== DOM ЭЛЕМЕНТЫ ==========
         const statusEl = document.getElementById('statusDisplay');
         const authButton = document.getElementById('authButton');
@@ -1501,8 +1523,12 @@
         };
 
         function openChatFromNotification(chatId) {
-            const contact = contacts.find(c => c.id === chatId) || groups.find(g => g.id === chatId) || { id: chatId, name: chatId };
-            openChat(contact);
+            if (chatId === CHANNEL_ID) {
+                openChannel();
+            } else {
+                const contact = contacts.find(c => c.id === chatId) || groups.find(g => g.id === chatId) || { id: chatId, name: chatId };
+                openChat(contact);
+            }
             if (notificationPopup) { notificationPopup.remove(); notificationPopup = null; }
         }
 
@@ -1615,7 +1641,7 @@
         }
 
         function clearChannel() {
-            if (!socket || currentUser?.id !== 'admin') {
+            if (!socket || currentUser?.id !== ADMIN_ID) {
                 showNotification('Только администратор может очищать канал', 'error');
                 return;
             }
@@ -1625,10 +1651,10 @@
                     type: 'clear_channel'
                 }));
                 
-                if (messages['channel']) {
-                    messages['channel'] = [];
+                if (messages[CHANNEL_ID]) {
+                    messages[CHANNEL_ID] = [];
                     saveMessages();
-                    if (currentChat && currentChat.id === 'channel') {
+                    if (currentChat && currentChat.id === CHANNEL_ID) {
                         renderMessages();
                     }
                 }
@@ -1788,8 +1814,8 @@
             
             let menuHtml = '';
             
-            if (currentChat.id === 'channel') {
-                if (currentUser && currentUser.id === 'admin') {
+            if (currentChat.id === CHANNEL_ID) {
+                if (currentUser && currentUser.id === ADMIN_ID) {
                     menuHtml += `<div class="chat-menu-item" onclick="clearChannel()"><span>🧹</span> Очистить канал</div>`;
                 }
             } else if (currentChat.id.startsWith('group_')) {
@@ -1828,19 +1854,43 @@
 
         // ========== КАНАЛ ==========
         function openChannel() {
-            currentChat = { id: 'channel', name: 'Clock Messenger', type: 'channel', verified: true };
+            currentChat = { 
+                id: CHANNEL_ID, 
+                name: 'Clock Messenger', 
+                type: 'channel', 
+                verified: true,
+                isChannel: true 
+            };
+            
             chatName.innerHTML = 'Clock Messenger <span class="verified-badge">✅</span>';
+            
+            // Показываем статистику канала
             chatStatus.innerHTML = `${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров`;
-            if (!messages['channel']) messages['channel'] = [];
+            
+            if (!messages[CHANNEL_ID]) {
+                messages[CHANNEL_ID] = [];
+            }
+            
             renderMessages();
+            
+            // Увеличиваем счётчик просмотров
             channelStats.views++;
-            chatInput.disabled = true;
-            sendMessageBtn.disabled = true;
-            if (currentUser && currentUser.id === 'admin') {
+            
+            // Разрешаем писать только админу
+            if (currentUser && currentUser.id === ADMIN_ID) {
                 chatInput.disabled = false;
                 sendMessageBtn.disabled = false;
+                chatInput.placeholder = "Написать в канал...";
+            } else {
+                chatInput.disabled = true;
+                sendMessageBtn.disabled = true;
+                chatInput.placeholder = "Только для чтения";
             }
-            if (socket) socket.send(JSON.stringify({ type: 'channel_view' }));
+            
+            if (socket) {
+                socket.send(JSON.stringify({ type: 'channel_view' }));
+            }
+            
             showScreen('chats');
         }
 
@@ -1850,7 +1900,11 @@
                 showNotification('Этот пользователь заблокирован', 'warning');
                 return;
             }
-            if (contact.id === 'channel') { openChannel(); return; }
+            
+            if (contact.id === CHANNEL_ID) { 
+                openChannel(); 
+                return; 
+            }
             
             currentChat = contact;
             chatName.textContent = contact.name || contact.username;
@@ -1862,10 +1916,16 @@
                 chatStatus.textContent = contact.status === 'online' ? 'в сети' : 'не в сети';
             }
             
-            if (!messages[contact.id]) messages[contact.id] = [];
+            if (!messages[contact.id]) {
+                messages[contact.id] = [];
+            }
+            
             renderMessages();
+            
             chatInput.disabled = false;
             sendMessageBtn.disabled = false;
+            chatInput.placeholder = "Сообщение...";
+            
             showScreen('chats');
         }
 
@@ -1895,17 +1955,22 @@
                     content = msg.text;
                 }
                 
-                let senderHtml = '';
-                if (currentChat.id.startsWith('group_') && msg.from !== currentUser.id) {
+                // Определяем отправителя
+                let senderName = '';
+                if (msg.from === 'channel' || msg.from === CHANNEL_ID) {
+                    senderName = 'Clock Messenger';
+                } else if (currentChat.id.startsWith('group_') && msg.from !== currentUser.id) {
                     const sender = contacts.find(c => c.id === msg.from) || { name: msg.from };
-                    senderHtml = `<div class="message-sender">${sender.name || msg.from}</div>`;
+                    senderName = sender.name || msg.from;
                 }
+                
+                let senderHtml = senderName ? `<div class="message-sender">${senderName}</div>` : '';
                 
                 let reactionsHtml = '';
                 if (msg.reactions && Object.keys(msg.reactions).length > 0) {
                     reactionsHtml = '<div class="message-reactions">';
                     for (const [react, count] of Object.entries(msg.reactions)) {
-                        reactionsHtml += `<span class="reaction" onclick="addReaction('${msg.id}', '${react}')">${react} ${count}</span>`;
+                        reactionsHtml += `<span class="reaction" onclick="event.stopPropagation(); addReaction('${msg.id}', '${react}')">${react} ${count}</span>`;
                     }
                     reactionsHtml += '</div>';
                 }
@@ -1938,13 +2003,32 @@
             messages[to].push(message);
             saveMessages();
             
-            if (currentChat && (currentChat.id === to || (currentChat.id === 'channel' && to === 'channel'))) {
+            if (currentChat && (currentChat.id === to)) {
                 renderMessages();
             }
             
-            if (from !== currentUser?.id && !blockedUsers.includes(from) && !to.startsWith('group_')) {
+            // Добавляем уведомление для канала
+            if (from === CHANNEL_ID || from === 'channel') {
+                addNotification({ 
+                    from: 'Clock Messenger', 
+                    text: text || '📎 Новое сообщение в канале', 
+                    timestamp: message.timestamp, 
+                    chatId: CHANNEL_ID 
+                });
+            } else if (from !== currentUser?.id && !blockedUsers.includes(from) && !to.startsWith('group_')) {
                 const sender = contacts.find(c => c.id === from) || { name: from };
                 addNotification({ from: sender.name || from, text: text || '📎 Файл', timestamp: message.timestamp, chatId: to });
+            }
+        }
+
+        function addReaction(messageId, reaction) {
+            if (socket && currentChat) {
+                socket.send(JSON.stringify({ 
+                    type: 'reaction', 
+                    chatId: currentChat.id, 
+                    messageId: messageId, 
+                    reaction: reaction 
+                }));
             }
         }
 
@@ -2080,29 +2164,23 @@
                     case 'message':
                         console.log('💬 Новое сообщение от:', data.from);
                         addMessage(data.from, data.from, data.text, data.timestamp);
-                        if (currentChat && currentChat.id === data.from) {
-                            renderMessages();
-                        }
                         break;
                         
                     case 'file_message':
                         console.log('📎 Новый файл от:', data.from);
                         addMessage(data.from, data.from, '', data.timestamp, data.fileData, data.fileName, data.fileType);
-                        if (currentChat && currentChat.id === data.from) {
-                            renderMessages();
-                        }
                         break;
                         
                     case 'channel_message':
                         console.log('📢 Новое сообщение в канале');
                         if (currentUser) {
-                            addMessage('channel', 'channel', data.content, data.timestamp, data.fileData, data.fileName, data.fileType);
+                            addMessage(CHANNEL_ID, CHANNEL_ID, data.content, data.timestamp, data.fileData, data.fileName, data.fileType);
                         }
                         break;
                         
                     case 'channel_stats':
                         channelStats = { subscribers: data.subscribers, views: data.views };
-                        if (currentChat && currentChat.id === 'channel') {
+                        if (currentChat && currentChat.id === CHANNEL_ID) {
                             chatStatus.innerHTML = `${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров`;
                         }
                         break;
@@ -2121,10 +2199,10 @@
                         
                     case 'channel_cleared':
                         console.log('🧹 Канал очищен');
-                        if (messages['channel']) {
-                            messages['channel'] = [];
+                        if (messages[CHANNEL_ID]) {
+                            messages[CHANNEL_ID] = [];
                             saveMessages();
-                            if (currentChat && currentChat.id === 'channel') {
+                            if (currentChat && currentChat.id === CHANNEL_ID) {
                                 renderMessages();
                             }
                         }
@@ -2253,10 +2331,20 @@
             
             if (!currentUser) return;
             
-            // Канал
+            // Канал (всегда показываем первым)
             const channelEl = document.createElement('div');
             channelEl.className = 'contact-item';
-            channelEl.innerHTML = `<div class="contact-avatar" style="background: var(--primary);">📢</div><div class="contact-info"><div class="contact-name">Clock Messenger <span class="verified-badge">✅</span></div><div class="contact-status">${channelStats.subscribers} подписчиков • ${channelStats.views} просмотров</div></div>`;
+            channelEl.innerHTML = `
+                <div class="contact-avatar" style="background: var(--primary);">📢</div>
+                <div class="contact-info">
+                    <div class="contact-name">
+                        Clock Messenger 
+                        <span class="verified-badge">✅</span>
+                        ${currentUser.id === ADMIN_ID ? '<span class="admin-badge">админ</span>' : ''}
+                    </div>
+                    <div class="contact-status">${channelStats.subscribers} подписчиков</div>
+                </div>
+            `;
             channelEl.onclick = openChannel;
             contactsList.appendChild(channelEl);
             
@@ -2265,7 +2353,13 @@
                 if (group.name.toLowerCase().includes(searchTerm)) {
                     const groupEl = document.createElement('div');
                     groupEl.className = 'contact-item';
-                    groupEl.innerHTML = `<div class="contact-avatar" style="background: var(--secondary);">👥</div><div class="contact-info"><div class="contact-name">${group.name} <span class="group-badge">группа</span></div><div class="contact-status">${group.members?.length || 1} участников</div></div>`;
+                    groupEl.innerHTML = `
+                        <div class="contact-avatar" style="background: var(--secondary);">👥</div>
+                        <div class="contact-info">
+                            <div class="contact-name">${group.name} <span class="group-badge">группа</span></div>
+                            <div class="contact-status">${group.members?.length || 1} участников</div>
+                        </div>
+                    `;
                     groupEl.onclick = () => openChat(group);
                     contactsList.appendChild(groupEl);
                 }
@@ -2281,7 +2375,13 @@
                 const isBlocked = blockedUsers.includes(contact.id);
                 const el = document.createElement('div');
                 el.className = 'contact-item';
-                el.innerHTML = `<div class="contact-avatar">${getInitials(contact.name || contact.username)}</div><div class="contact-info"><div class="contact-name">${contact.name || contact.username}${isBlocked ? ' <span class="blocked-badge">заблокирован</span>' : ''}</div><div class="contact-status">${contact.status === 'online' ? '🟢 в сети' : '⚫ не в сети'}</div></div>`;
+                el.innerHTML = `
+                    <div class="contact-avatar">${getInitials(contact.name || contact.username)}</div>
+                    <div class="contact-info">
+                        <div class="contact-name">${contact.name || contact.username}${isBlocked ? ' <span class="blocked-badge">заблокирован</span>' : ''}</div>
+                        <div class="contact-status">${contact.status === 'online' ? '🟢 в сети' : '⚫ не в сети'}</div>
+                    </div>
+                `;
                 el.onclick = () => openChat(contact);
                 contactsList.appendChild(el);
             });
@@ -2441,11 +2541,24 @@
             const text = chatInput.value.trim();
             if (!text) return;
             
-            socket.send(JSON.stringify({ 
-                type: 'message', 
-                to: currentChat.id, 
-                text: text 
-            }));
+            // Если это канал и пользователь админ
+            if (currentChat.id === CHANNEL_ID) {
+                if (currentUser.id === ADMIN_ID) {
+                    socket.send(JSON.stringify({ 
+                        type: 'channel_message', 
+                        content: text 
+                    }));
+                } else {
+                    showNotification('Только администратор может писать в канал', 'error');
+                    return;
+                }
+            } else {
+                socket.send(JSON.stringify({ 
+                    type: 'message', 
+                    to: currentChat.id, 
+                    text: text 
+                }));
+            }
             
             addMessage(currentUser.id, currentChat.id, text);
             chatInput.value = '';

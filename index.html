@@ -113,6 +113,23 @@
             transition: all 0.2s;
         }
 
+        .logout-button {
+            background: var(--error);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-left: 8px;
+        }
+
+        .logout-button:hover {
+            opacity: 0.8;
+        }
+
         .user-info {
             display: flex;
             align-items: center;
@@ -933,6 +950,7 @@
                 <div id="userInfo" class="user-info hidden">
                     <div id="userAvatar" class="user-avatar-small">?</div>
                     <span id="userName"></span>
+                    <button id="logoutBtn" class="logout-button">Выйти</button>
                 </div>
             </div>
         </div>
@@ -1098,13 +1116,13 @@
     <div id="notificationContainer" class="notification-container"></div>
 
     <script>
+        // ========== СОСТОЯНИЕ ==========
         let token = localStorage.getItem('token');
         let currentUser = null;
         let contacts = [];
         let messages = JSON.parse(localStorage.getItem('messages')) || {};
         let currentChat = null;
         let groups = JSON.parse(localStorage.getItem('groups')) || [];
-        let groupMembers = {};
         let socket = null;
         let currentTab = 'contacts';
         let pendingRequests = [];
@@ -1113,8 +1131,10 @@
         let blockedUsers = JSON.parse(localStorage.getItem('blockedUsers')) || [];
         let selectedContactsForGroup = [];
 
+        // ========== DOM ЭЛЕМЕНТЫ ==========
         const statusEl = document.getElementById('statusDisplay');
         const authButton = document.getElementById('authButton');
+        const logoutBtn = document.getElementById('logoutBtn');
         const userInfo = document.getElementById('userInfo');
         const userName = document.getElementById('userName');
         const userAvatar = document.getElementById('userAvatar');
@@ -1202,6 +1222,7 @@
         const notificationCount = document.getElementById('notificationCount');
         let notificationPopup = null;
 
+        // ========== УТИЛИТЫ ==========
         function showNotification(message, type = 'info') {
             const container = document.getElementById('notificationContainer');
             const notification = document.createElement('div');
@@ -1238,10 +1259,46 @@
             confirmTitle.textContent = title;
             confirmMessage.textContent = message;
             confirmModal.classList.add('active');
-            confirmOk.onclick = () => { onConfirm(); confirmModal.classList.remove('active'); };
-            confirmCancel.onclick = () => confirmModal.classList.remove('active');
+            
+            const originalOnClick = confirmOk.onclick;
+            confirmOk.onclick = () => { 
+                onConfirm(); 
+                confirmModal.classList.remove('active');
+                confirmOk.onclick = originalOnClick;
+            };
+            
+            confirmCancel.onclick = () => {
+                confirmModal.classList.remove('active');
+            };
         }
 
+        function logout() {
+            showConfirm('Выход из аккаунта', 'Вы уверены, что хотите выйти?', () => {
+                if (socket) {
+                    socket.close();
+                    socket = null;
+                }
+                
+                currentUser = null;
+                token = null;
+                localStorage.removeItem('token');
+                
+                contacts = [];
+                groups = [];
+                messages = {};
+                notifications = [];
+                pendingRequests = [];
+                blockedUsers = [];
+                
+                updateUIForUser();
+                showScreen('auth');
+                showNotification('Вы вышли из аккаунта', 'info');
+            });
+        }
+
+        logoutBtn.onclick = logout;
+
+        // ========== СИСТЕМА УВЕДОМЛЕНИЙ ==========
         function addNotification(notification) {
             notifications.unshift(notification);
             if (notifications.length > 50) notifications.pop();
@@ -1286,6 +1343,7 @@
             if (notificationPopup) { notificationPopup.remove(); notificationPopup = null; }
         }
 
+        // ========== ОБРАБОТКА ЗАЯВОК ==========
         function showFriendRequestNotification(request) {
             pendingRequests.push(request);
             const container = document.getElementById('notificationContainer');
@@ -1317,6 +1375,7 @@
             }
         };
 
+        // ========== ФАЙЛЫ ==========
         attachFileBtn.onclick = () => {
             const input = document.createElement('input');
             input.type = 'file';
@@ -1327,7 +1386,13 @@
                 const reader = new FileReader();
                 reader.onload = () => {
                     if (currentChat && socket) {
-                        socket.send(JSON.stringify({ type: 'file_message', to: currentChat.id, fileName: file.name, fileType: file.type, fileData: reader.result }));
+                        socket.send(JSON.stringify({ 
+                            type: 'file_message', 
+                            to: currentChat.id, 
+                            fileName: file.name, 
+                            fileType: file.type, 
+                            fileData: reader.result 
+                        }));
                     }
                 };
                 reader.readAsDataURL(file);
@@ -1335,12 +1400,19 @@
             input.click();
         };
 
+        // ========== РЕАКЦИИ ==========
         function addReaction(messageId, reaction) {
             if (socket && currentChat) {
-                socket.send(JSON.stringify({ type: 'reaction', messageId: messageId, reaction: reaction, chatId: currentChat.id }));
+                socket.send(JSON.stringify({ 
+                    type: 'reaction', 
+                    messageId: messageId, 
+                    reaction: reaction, 
+                    chatId: currentChat.id 
+                }));
             }
         }
 
+        // ========== УПРАВЛЕНИЕ КОНТАКТАМИ ==========
         function blockContact(contactId) {
             if (!blockedUsers.includes(contactId)) {
                 blockedUsers.push(contactId);
@@ -1500,14 +1572,16 @@
                     memberId: memberId
                 }));
                 
-                // Локально обновляем список участников
                 const group = groups.find(g => g.id === currentChat.id);
                 if (group && group.members) {
                     group.members = group.members.filter(id => id !== memberId);
                     saveGroups();
+                    showGroupMembers();
+                    if (currentChat && currentChat.id === currentChat.id) {
+                        chatStatus.textContent = `${group.members.length} участников`;
+                    }
                 }
                 
-                showGroupMembers();
                 showNotification('Участник исключен', 'success');
             });
         }
@@ -1531,6 +1605,32 @@
             });
         }
 
+        function leaveGroup() {
+            if (!currentChat || !currentChat.id.startsWith('group_')) return;
+            
+            showConfirm('Покинуть группу', 'Вы уверены, что хотите покинуть группу?', () => {
+                if (socket) {
+                    socket.send(JSON.stringify({
+                        type: 'leave_group',
+                        groupId: currentChat.id
+                    }));
+                    
+                    const group = groups.find(g => g.id === currentChat.id);
+                    if (group && group.members) {
+                        group.members = group.members.filter(id => id !== currentUser.id);
+                        if (group.members.length === 0) {
+                            groups = groups.filter(g => g.id !== currentChat.id);
+                        }
+                        saveGroups();
+                    }
+                    
+                    showScreen('contacts');
+                    showNotification('Вы покинули группу', 'info');
+                }
+            });
+        }
+
+        // ========== МЕНЮ ЧАТА ==========
         function updateChatMenu() {
             if (!currentChat) { chatMenu.style.display = 'none'; return; }
             
@@ -1548,7 +1648,7 @@
                         menuHtml += `<div class="chat-menu-item" onclick="addToGroup()"><span>➕</span> Добавить участников</div>`;
                         menuHtml += `<div class="chat-menu-item danger" onclick="deleteGroup()"><span>🗑️</span> Удалить группу</div>`;
                     } else {
-                        menuHtml += `<div class="chat-menu-item danger" onclick="leaveGroup()"><span>🚪</span> Покинуть группу</div>`;
+                        menuHtml += `<div class="chat-menu-item warning" onclick="leaveGroup()"><span>🚪</span> Покинуть группу</div>`;
                     }
                     menuHtml += `<div class="chat-menu-item" onclick="clearChat('${currentChat.id}')"><span>🧹</span> Очистить чат</div>`;
                 }
@@ -1574,6 +1674,7 @@
 
         document.addEventListener('click', () => chatMenu.classList.remove('active'));
 
+        // ========== КАНАЛ ==========
         function openChannel() {
             currentChat = { id: 'channel', name: 'Clock Messenger', type: 'channel', verified: true };
             chatName.innerHTML = 'Clock Messenger <span class="verified-badge">✅</span>';
@@ -1591,6 +1692,7 @@
             showScreen('chats');
         }
 
+        // ========== ЧАТ ==========
         function openChat(contact) {
             if (blockedUsers.includes(contact.id) && contact.id !== currentUser.id) {
                 showNotification('Этот пользователь заблокирован', 'warning');
@@ -1689,6 +1791,7 @@
             }
         }
 
+        // ========== НАВИГАЦИЯ ==========
         function showScreen(screenName) {
             authScreen.classList.remove('active');
             contactsScreen.classList.remove('active');
@@ -1716,6 +1819,7 @@
             currentTab = screenName;
         }
 
+        // ========== API ==========
         async function login(email, password) {
             try {
                 const res = await fetch('/api/login', { 
@@ -1762,6 +1866,7 @@
             }
         }
 
+        // ========== WEB SOCKET ==========
         function connectWebSocket() {
             const wsUrl = `wss://${window.location.host}`;
             socket = new WebSocket(wsUrl);
@@ -1769,12 +1874,14 @@
             socket.onopen = () => {
                 statusEl.className = 'status-connected';
                 statusEl.innerHTML = '🟢 Подключено';
-                socket.send(JSON.stringify({ type: 'auth', token }));
+                if (token) {
+                    socket.send(JSON.stringify({ type: 'auth', token }));
+                }
             };
             
             socket.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                console.log('📨', data);
+                console.log('📨 Получено:', data.type);
                 
                 switch(data.type) {
                     case 'auth_success':
@@ -1785,12 +1892,17 @@
                         break;
                         
                     case 'friends_list':
+                        console.log('📋 Обновление списка друзей:', data.friends);
                         contacts = data.friends || [];
                         updateContacts();
                         break;
                         
                     case 'friend_request':
-                        showFriendRequestNotification({ from: data.from, fromName: data.fromName || data.from });
+                        console.log('🔔 Новая заявка от:', data.from);
+                        showFriendRequestNotification({ 
+                            from: data.from, 
+                            fromName: data.fromName || data.from 
+                        });
                         break;
                         
                     case 'friend_request_sent':
@@ -1802,14 +1914,23 @@
                         break;
                         
                     case 'message':
+                        console.log('💬 Новое сообщение от:', data.from);
                         addMessage(data.from, data.from, data.text, data.timestamp);
+                        if (currentChat && currentChat.id === data.from) {
+                            renderMessages();
+                        }
                         break;
                         
                     case 'file_message':
+                        console.log('📎 Новый файл от:', data.from);
                         addMessage(data.from, data.from, '', data.timestamp, data.fileData, data.fileName, data.fileType);
+                        if (currentChat && currentChat.id === data.from) {
+                            renderMessages();
+                        }
                         break;
                         
                     case 'channel_message':
+                        console.log('📢 Новое сообщение в канале');
                         if (currentUser) {
                             addMessage('channel', 'channel', data.content, data.timestamp, data.fileData, data.fileName, data.fileType);
                         }
@@ -1823,6 +1944,7 @@
                         break;
                         
                     case 'chat_cleared':
+                        console.log('🧹 Чат очищен:', data.chatId);
                         if (messages[data.chatId]) {
                             messages[data.chatId] = [];
                             saveMessages();
@@ -1834,6 +1956,7 @@
                         break;
                         
                     case 'channel_cleared':
+                        console.log('🧹 Канал очищен');
                         if (messages['channel']) {
                             messages['channel'] = [];
                             saveMessages();
@@ -1870,7 +1993,6 @@
                         
                     case 'member_kicked':
                         if (data.groupId && data.memberId === currentUser?.id) {
-                            // Текущего пользователя исключили
                             groups = groups.filter(g => g.id !== data.groupId);
                             saveGroups();
                             updateContacts();
@@ -1879,7 +2001,6 @@
                             }
                             showNotification('Вас исключили из группы', 'warning');
                         } else if (data.groupId) {
-                            // Обновляем список участников
                             const group = groups.find(g => g.id === data.groupId);
                             if (group && group.members) {
                                 group.members = group.members.filter(id => id !== data.memberId);
@@ -1904,6 +2025,9 @@
                     case 'error':
                         showNotification(data.message, 'error');
                         break;
+                        
+                    default:
+                        console.log('❓ Неизвестный тип:', data.type);
                 }
             };
             
@@ -1912,23 +2036,35 @@
                 statusEl.innerHTML = '🔴 Не подключено';
                 setTimeout(connectWebSocket, 3000);
             };
+            
+            socket.onerror = (error) => {
+                console.error('WebSocket ошибка:', error);
+            };
         }
 
+        // ========== ОБНОВЛЕНИЕ ИНТЕРФЕЙСА ==========
         function updateUIForUser() {
-            authButton.classList.add('hidden');
-            userInfo.classList.remove('hidden');
-            userName.textContent = currentUser.name || currentUser.username;
-            userAvatar.textContent = getInitials(currentUser.name || currentUser.username);
-            profileName.textContent = currentUser.name || currentUser.username;
-            profileUsername.textContent = '@' + currentUser.username;
-            profileBio.textContent = currentUser.bio || 'Нет описания';
-            profileAvatar.textContent = getInitials(currentUser.name || currentUser.username);
+            if (currentUser) {
+                authButton.classList.add('hidden');
+                userInfo.classList.remove('hidden');
+                userName.textContent = currentUser.name || currentUser.username;
+                userAvatar.textContent = getInitials(currentUser.name || currentUser.username);
+                profileName.textContent = currentUser.name || currentUser.username;
+                profileUsername.textContent = '@' + currentUser.username;
+                profileBio.textContent = currentUser.bio || 'Нет описания';
+                profileAvatar.textContent = getInitials(currentUser.name || currentUser.username);
+            } else {
+                authButton.classList.remove('hidden');
+                userInfo.classList.add('hidden');
+            }
             updateContacts();
         }
 
         function updateContacts() {
             const searchTerm = searchContacts?.value?.toLowerCase() || '';
             contactsList.innerHTML = '';
+            
+            if (!currentUser) return;
             
             // Канал
             const channelEl = document.createElement('div');
@@ -2003,7 +2139,10 @@
         
         addFriendConfirm.onclick = () => {
             if (socket && addFriendInput.value) {
-                socket.send(JSON.stringify({ type: 'add_friend', friendId: addFriendInput.value }));
+                socket.send(JSON.stringify({ 
+                    type: 'add_friend', 
+                    friendId: addFriendInput.value 
+                }));
                 addFriendModal.classList.remove('active');
                 addFriendInput.value = '';
                 showNotification('Запрос отправлен', 'success');
@@ -2071,7 +2210,9 @@
                     if (!group.members) group.members = [];
                     group.members = [...new Set([...group.members, ...selectedContactsForGroup])];
                     saveGroups();
-                    chatStatus.textContent = `${group.members.length} участников`;
+                    if (currentChat && currentChat.id === group.id) {
+                        chatStatus.textContent = `${group.members.length} участников`;
+                    }
                 }
                 
                 addToGroupModal.classList.remove('active');
@@ -2141,10 +2282,12 @@
         });
 
         setInterval(() => {
-            if (socket && currentUser) socket.send(JSON.stringify({ type: 'get_channel_stats' }));
+            if (socket && currentUser) {
+                socket.send(JSON.stringify({ type: 'get_channel_stats' }));
+            }
         }, 30000);
 
-        // Инициализация
+        // ========== ИНИЦИАЛИЗАЦИЯ ==========
         if (token) {
             connectWebSocket();
             showScreen('contacts');

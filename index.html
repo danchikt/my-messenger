@@ -6,7 +6,7 @@
     <meta name="theme-color" id="themeColor" content="#8774e1">
     <link rel="manifest" href="/manifest.json">
     <title>Clock Messenger</title>
-    <style id="themeStyle">
+    <style>
         * {
             margin: 0;
             padding: 0;
@@ -433,6 +433,60 @@
             color: var(--text-secondary);
             cursor: pointer;
             padding: 4px;
+        }
+
+        /* Панель ответа/редактирования */
+        .reply-preview {
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+            padding: 8px 16px;
+            animation: slideUp 0.2s ease;
+        }
+
+        .reply-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 8px 12px;
+        }
+
+        .reply-icon {
+            font-size: 20px;
+        }
+
+        .reply-text-container {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .reply-label {
+            font-size: 12px;
+            color: var(--primary);
+            font-weight: 600;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .reply-text {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: block;
+        }
+
+        .reply-close {
+            font-size: 18px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .reply-close:hover {
+            color: var(--error);
         }
 
         .message {
@@ -1258,6 +1312,33 @@
             padding: 4px 16px;
             font-style: italic;
         }
+
+        /* Адаптация для телефона */
+        @media (max-width: 500px) {
+            .reply-preview {
+                padding: 4px 12px;
+            }
+            
+            .reply-content {
+                padding: 6px 10px;
+            }
+            
+            .reply-icon {
+                font-size: 18px;
+            }
+            
+            .reply-label {
+                font-size: 11px;
+            }
+            
+            .reply-text {
+                font-size: 13px;
+            }
+            
+            .message {
+                max-width: 85%;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1338,6 +1419,31 @@
                 </div>
                 <div id="typingIndicator" class="typing-indicator" style="display: none;"></div>
                 <div id="chatMessages" class="chat-messages"></div>
+                
+                <!-- Панель ответа -->
+                <div id="replyPreview" class="reply-preview" style="display: none;">
+                    <div class="reply-content">
+                        <span class="reply-icon">↩️</span>
+                        <div class="reply-text-container">
+                            <span class="reply-label">Ответ на сообщение</span>
+                            <span class="reply-text" id="replyPreviewText"></span>
+                        </div>
+                        <span class="reply-close" onclick="cancelReply()">✕</span>
+                    </div>
+                </div>
+
+                <!-- Панель редактирования -->
+                <div id="editPreview" class="reply-preview" style="display: none;">
+                    <div class="reply-content">
+                        <span class="reply-icon">✏️</span>
+                        <div class="reply-text-container">
+                            <span class="reply-label">Редактирование</span>
+                            <span class="reply-text" id="editPreviewText"></span>
+                        </div>
+                        <span class="reply-close" onclick="cancelEdit()">✕</span>
+                    </div>
+                </div>
+
                 <div class="chat-input-area">
                     <button class="attach-btn" id="attachFileBtn">📎</button>
                     <input type="text" id="chatInput" class="chat-input" placeholder="Сообщение..." disabled>
@@ -1641,18 +1747,6 @@
         </div>
     </div>
 
-    <div id="replyPreview" class="pinned-message-bar" style="display: none;">
-        <span class="pinned-icon">↩️</span>
-        <span class="pinned-text" id="replyPreviewText"></span>
-        <span class="pinned-close" onclick="cancelReply()">✕</span>
-    </div>
-
-    <div id="editPreview" class="pinned-message-bar" style="display: none;">
-        <span class="pinned-icon">✏️</span>
-        <span class="pinned-text">Редактирование сообщения</span>
-        <span class="pinned-close" onclick="cancelEdit()">✕</span>
-    </div>
-
     <div id="confirmModal" class="modal">
         <div class="modal-content">
             <div class="modal-title" id="confirmTitle">Подтверждение</div>
@@ -1761,6 +1855,7 @@
         const replyPreview = document.getElementById('replyPreview');
         const replyPreviewText = document.getElementById('replyPreviewText');
         const editPreview = document.getElementById('editPreview');
+        const editPreviewText = document.getElementById('editPreviewText');
         
         const profileAvatar = document.getElementById('profileAvatar');
         const profileName = document.getElementById('profileName');
@@ -1830,7 +1925,6 @@
             const root = document.documentElement;
             const themeColor = document.getElementById('themeColor');
             
-            // Применяем тему
             if (theme === 'dark') {
                 root.setAttribute('data-theme', 'dark');
                 themeColor.setAttribute('content', '#1a1a1a');
@@ -1840,17 +1934,14 @@
                 themeColor.setAttribute('content', '#8774e1');
                 document.getElementById('currentTheme').textContent = 'Светлая';
             } else {
-                // Системная тема
                 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
                 root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
                 themeColor.setAttribute('content', prefersDark ? '#1a1a1a' : '#8774e1');
                 document.getElementById('currentTheme').textContent = 'Системная';
             }
 
-            // Применяем акцентный цвет
             root.style.setProperty('--primary', accentColor);
             
-            // Сохраняем
             localStorage.setItem('theme', theme);
             localStorage.setItem('accentColor', accentColor);
         }
@@ -1859,7 +1950,6 @@
             theme = newTheme;
             applyTheme();
             
-            // Обновляем выделение в модалке
             document.querySelectorAll('.theme-option').forEach(opt => {
                 opt.classList.remove('selected');
             });
@@ -1991,7 +2081,6 @@
         }
 
         function showArchive() {
-            // TODO: показать архив чатов
             showNotification('Архив в разработке', 'info');
         }
 
@@ -2017,7 +2106,6 @@
                     pinnedMessages[currentChat.id] = [];
                 }
                 
-                // Проверяем, не закреплено ли уже
                 if (!pinnedMessages[currentChat.id].find(m => m.id === selectedMessage.id)) {
                     pinnedMessages[currentChat.id].push({
                         ...selectedMessage,
@@ -2025,7 +2113,6 @@
                         pinnedAt: new Date().toISOString()
                     });
                     
-                    // Ограничиваем до 3 закреплённых
                     if (pinnedMessages[currentChat.id].length > 3) {
                         pinnedMessages[currentChat.id].shift();
                     }
@@ -2105,7 +2192,6 @@
                     if (!message.reactions) message.reactions = {};
                     if (!message.reactions.users) message.reactions.users = {};
                     
-                    // Если пользователь уже поставил эту реакцию - убираем
                     if (message.reactions.users[reaction]?.includes(currentUser.id)) {
                         message.reactions[reaction]--;
                         message.reactions.users[reaction] = message.reactions.users[reaction].filter(id => id !== currentUser.id);
@@ -2122,7 +2208,6 @@
                             remove: true
                         }));
                     } else {
-                        // Убираем предыдущую реакцию пользователя
                         for (let r in message.reactions.users) {
                             if (message.reactions.users[r]?.includes(currentUser.id)) {
                                 message.reactions[r]--;
@@ -2134,7 +2219,6 @@
                             }
                         }
                         
-                        // Добавляем новую
                         message.reactions[reaction] = (message.reactions[reaction] || 0) + 1;
                         if (!message.reactions.users[reaction]) message.reactions.users[reaction] = [];
                         message.reactions.users[reaction].push(currentUser.id);
@@ -2155,13 +2239,21 @@
             }
         }
 
+        function addReactionToSelectedFromMsg(messageId, reaction) {
+            selectedMessageId = messageId;
+            selectedMessage = messages[currentChat?.id]?.find(m => m.id === messageId);
+            addReactionToSelected(reaction);
+        }
+
         // ========== РЕДАКТИРОВАНИЕ ==========
         function editMessage() {
             if (selectedMessage && selectedMessage.from === currentUser.id) {
                 editingMessage = selectedMessage;
                 chatInput.value = selectedMessage.text;
                 editPreview.style.display = 'flex';
+                editPreviewText.textContent = selectedMessage.text || 'Сообщение';
                 closeMessageOptionsModal();
+                chatInput.focus();
             }
         }
 
@@ -2264,6 +2356,7 @@
                 replyPreview.style.display = 'flex';
                 replyPreviewText.textContent = selectedMessage.text || 'Ответ на сообщение';
                 closeMessageOptionsModal();
+                chatInput.focus();
             }
         }
 
@@ -2277,7 +2370,6 @@
             selectedMessage = message;
             messageOptionsTitle.textContent = 'Действия с сообщением';
             
-            // Настраиваем видимость пунктов
             pinMessageOption.style.display = message.from === currentUser.id ? 'flex' : 'none';
             editMessageOption.style.display = message.from === currentUser.id ? 'flex' : 'none';
             deleteMessageOption.style.display = message.from === currentUser.id ? 'flex' : 'none';
@@ -2341,13 +2433,6 @@
                 </div>
             `;
             container.appendChild(notification);
-            
-            if (notificationSettings.sound) {
-                // play sound
-            }
-            if (notificationSettings.vibrate) {
-                // vibrate
-            }
             
             setTimeout(() => notification.remove(), 4000);
         }
@@ -3045,12 +3130,6 @@
             }
         }
 
-        function addReactionToSelectedFromMsg(messageId, reaction) {
-            selectedMessageId = messageId;
-            selectedMessage = messages[currentChat?.id]?.find(m => m.id === messageId);
-            addReactionToSelected(reaction);
-        }
-
         // ========== НАВИГАЦИЯ ==========
         function showScreen(screenName) {
             authScreen.classList.remove('active');
@@ -3357,7 +3436,6 @@
                                         }
                                     }
                                 } else {
-                                    // Убираем предыдущую реакцию пользователя
                                     for (let r in msg.reactions.users) {
                                         if (msg.reactions.users[r]?.includes(data.userId)) {
                                             msg.reactions[r]--;
@@ -3427,7 +3505,7 @@
             
             if (!currentUser) return;
             
-            // Канал (всегда показываем первым)
+            // Канал
             const channelEl = document.createElement('div');
             channelEl.className = 'contact-item';
             channelEl.innerHTML = `
@@ -3487,7 +3565,7 @@
                 }
             });
             
-            // Обычные контакты (не закреплённые)
+            // Обычные контакты
             const regular = contacts.filter(c => !pinnedContacts.includes(c.id));
             const filtered = regular.filter(c => 
                 (c.name || '').toLowerCase().includes(searchTerm) || 

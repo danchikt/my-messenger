@@ -18,7 +18,7 @@
             --primary: #8774e1;
             --primary-dark: #6b5b9e;
             --secondary: #31c4b2;
-            --bg: #f8f9fa;
+            --bg: #f5f7fb;
             --surface: #ffffff;
             --text: #1c1e21;
             --text-secondary: #65676b;
@@ -28,8 +28,8 @@
         }
 
         body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
+            background: var(--bg);
+            height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -41,24 +41,14 @@
             width: 100%;
             max-width: 500px;
             height: 100vh;
-            max-height: 900px;
-            background: var(--bg);
+            background: var(--surface);
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            border-radius: 0;
-            box-shadow: none;
+            box-shadow: 0 0 20px rgba(0,0,0,0.05);
         }
 
-        @media (min-width: 500px) {
-            .app-container {
-                height: 95vh;
-                border-radius: 30px;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            }
-        }
-
-        /* Статус бар */
+        /* Статус бар с колокольчиком */
         .status-bar {
             background: var(--surface);
             padding: 12px 16px;
@@ -66,16 +56,49 @@
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border);
-            font-size: 14px;
-            font-weight: 500;
+        }
+
+        .status-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
         .status-connected {
             color: var(--success);
+            font-size: 14px;
+            font-weight: 500;
         }
 
         .status-disconnected {
             color: var(--error);
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .notification-badge {
+            position: relative;
+            cursor: pointer;
+        }
+
+        .bell-icon {
+            font-size: 22px;
+        }
+
+        .bell-count {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: var(--error);
+            color: white;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
         }
 
         .auth-button {
@@ -88,10 +111,6 @@
             font-size: 14px;
             cursor: pointer;
             transition: all 0.2s;
-        }
-
-        .auth-button:hover {
-            background: var(--primary-dark);
         }
 
         .user-info {
@@ -119,6 +138,7 @@
             overflow-y: auto;
             padding: 16px;
             display: none;
+            background: var(--bg);
         }
 
         .main-content.active {
@@ -138,6 +158,7 @@
             border-radius: 20px;
             padding: 24px;
             margin-top: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
 
         .auth-tabs {
@@ -200,6 +221,7 @@
             align-items: center;
             gap: 8px;
             border: 1px solid var(--border);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
         .search-bar input {
@@ -215,13 +237,13 @@
         }
 
         /* Список контактов */
-        .contacts-list, .chats-list {
+        .contacts-list {
             display: flex;
             flex-direction: column;
             gap: 8px;
         }
 
-        .contact-item, .chat-item {
+        .contact-item {
             background: var(--surface);
             border-radius: 12px;
             padding: 12px;
@@ -230,13 +252,14 @@
             gap: 12px;
             cursor: pointer;
             transition: background 0.2s;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        .contact-item:hover, .chat-item:hover {
+        .contact-item:hover {
             background: #f0f2f5;
         }
 
-        .contact-avatar, .chat-avatar {
+        .contact-avatar {
             width: 48px;
             height: 48px;
             border-radius: 50%;
@@ -247,18 +270,123 @@
             justify-content: center;
             font-weight: bold;
             font-size: 20px;
+            flex-shrink: 0;
         }
 
-        .contact-info, .chat-info {
+        .contact-info {
             flex: 1;
         }
 
-        .contact-name, .chat-name {
+        .contact-name {
             font-weight: 600;
             margin-bottom: 4px;
         }
 
-        .contact-status, .chat-last-message {
+        .contact-status {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        /* Чат */
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
+        }
+
+        .message-mine {
+            align-self: flex-end;
+            background: var(--primary);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+
+        .message-other {
+            align-self: flex-start;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px;
+        }
+
+        .message-time {
+            font-size: 10px;
+            margin-top: 4px;
+            opacity: 0.7;
+            text-align: right;
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 8px;
+            padding: 12px 16px;
+            background: var(--surface);
+            border-top: 1px solid var(--border);
+        }
+
+        .chat-input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            font-size: 16px;
+            background: var(--bg);
+        }
+
+        .chat-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .chat-send {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chat-header {
+            padding: 16px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .chat-back {
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--primary);
+        }
+
+        .chat-header-info {
+            flex: 1;
+        }
+
+        .chat-header-name {
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .chat-header-status {
             font-size: 13px;
             color: var(--text-secondary);
         }
@@ -270,6 +398,7 @@
             padding: 24px;
             text-align: center;
             margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
 
         .profile-avatar-large {
@@ -354,6 +483,7 @@
             padding: 20px;
             text-align: center;
             margin-bottom: 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
 
         .channel-badge {
@@ -371,6 +501,7 @@
             border-radius: 12px;
             padding: 12px;
             margin-bottom: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
         .channel-message-author {
@@ -479,7 +610,7 @@
         /* Уведомления */
         .notification-container {
             position: fixed;
-            top: 20px;
+            top: 80px;
             left: 50%;
             transform: translateX(-50%);
             z-index: 2000;
@@ -517,60 +648,21 @@
         }
 
         .hidden {
-            display: none;
+            display: none !important;
         }
 
-        /* Колокольчик уведомлений */
-        .notification-bell {
+        /* Попап заявок */
+        .requests-popup {
             position: fixed;
-            top: 60px;
-            right: 20px;
-            background: var(--primary);
-            color: white;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            z-index: 100;
-            animation: pulse 2s infinite;
-        }
-
-        @keyframes pulse {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-
-        .bell-count {
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            background: var(--error);
-            color: white;
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            font-size: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .notification-popup {
-            position: fixed;
-            top: 120px;
-            right: 20px;
+            top: 80px;
+            right: 16px;
             background: var(--surface);
-            border-radius: 12px;
+            border-radius: 16px;
             padding: 16px;
             box-shadow: 0 8px 24px rgba(0,0,0,0.15);
             z-index: 101;
-            min-width: 250px;
-            max-width: 300px;
+            min-width: 280px;
+            max-width: 320px;
             max-height: 400px;
             overflow-y: auto;
             animation: slideIn 0.3s ease;
@@ -587,7 +679,7 @@
             }
         }
 
-        .notification-item {
+        .request-item {
             padding: 12px;
             border-bottom: 1px solid var(--border);
             display: flex;
@@ -595,11 +687,11 @@
             gap: 12px;
         }
 
-        .notification-item:last-child {
+        .request-item:last-child {
             border-bottom: none;
         }
 
-        .notification-avatar {
+        .request-avatar {
             width: 40px;
             height: 40px;
             border-radius: 50%;
@@ -612,28 +704,28 @@
             flex-shrink: 0;
         }
 
-        .notification-content {
+        .request-content {
             flex: 1;
         }
 
-        .notification-title {
+        .request-name {
             font-weight: 600;
             margin-bottom: 4px;
             font-size: 14px;
         }
 
-        .notification-text {
+        .request-text {
             font-size: 12px;
             color: var(--text-secondary);
+            margin-bottom: 8px;
         }
 
-        .notification-actions {
+        .request-actions {
             display: flex;
             gap: 8px;
-            margin-top: 8px;
         }
 
-        .notification-btn {
+        .request-btn {
             padding: 6px 12px;
             border: none;
             border-radius: 8px;
@@ -643,16 +735,12 @@
             transition: opacity 0.2s;
         }
 
-        .notification-btn:hover {
-            opacity: 0.8;
-        }
-
-        .btn-accept {
+        .request-btn-accept {
             background: var(--success);
             color: white;
         }
 
-        .btn-decline {
+        .request-btn-decline {
             background: var(--error);
             color: white;
         }
@@ -662,7 +750,13 @@
     <div class="app-container">
         <!-- Статус бар -->
         <div class="status-bar">
-            <div id="statusDisplay" class="status-disconnected">🔴 Не подключено</div>
+            <div class="status-left">
+                <div id="statusDisplay" class="status-disconnected">🔴 Не подключено</div>
+                <div class="notification-badge" id="notificationBell" style="display: none;">
+                    <span class="bell-icon">🔔</span>
+                    <span class="bell-count" id="notificationCount">0</span>
+                </div>
+            </div>
             <div id="authContainer">
                 <button id="authButton" class="auth-button">Войти</button>
                 <div id="userInfo" class="user-info hidden">
@@ -670,12 +764,6 @@
                     <span id="userName"></span>
                 </div>
             </div>
-        </div>
-
-        <!-- Колокольчик уведомлений -->
-        <div class="notification-bell" id="notificationBell" style="display: none;">
-            <span class="bell-icon">🔔</span>
-            <span class="bell-count" id="notificationCount">0</span>
         </div>
 
         <!-- Основной контент -->
@@ -712,16 +800,23 @@
                     <input type="text" id="searchContacts" placeholder="Поиск контактов...">
                     <button id="addFriendBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">➕</button>
                 </div>
-                <div id="contactsList" class="contacts-list">
-                    <!-- Контакты будут здесь -->
-                </div>
+                <div id="contactsList" class="contacts-list"></div>
             </div>
         </div>
 
         <div id="chatsScreen" class="main-content">
             <div class="chats-screen">
-                <div id="chatsList" class="chats-list">
-                    <!-- Чаты будут здесь -->
+                <div class="chat-header">
+                    <span class="chat-back" onclick="showScreen('contacts')">←</span>
+                    <div class="chat-header-info">
+                        <div class="chat-header-name" id="chatName">Выберите чат</div>
+                        <div class="chat-header-status" id="chatStatus"></div>
+                    </div>
+                </div>
+                <div id="chatMessages" class="chat-messages"></div>
+                <div class="chat-input-area">
+                    <input type="text" id="chatInput" class="chat-input" placeholder="Сообщение..." disabled>
+                    <button id="sendMessageBtn" class="chat-send" disabled>➤</button>
                 </div>
             </div>
         </div>
@@ -757,9 +852,7 @@
                     <h2>📢 Официальный канал</h2>
                     <span class="channel-badge">✅ Официальный</span>
                 </div>
-                <div id="channelMessages" style="flex: 1; overflow-y: auto; margin-bottom: 12px;">
-                    <!-- Сообщения канала -->
-                </div>
+                <div id="channelMessages" style="flex: 1; overflow-y: auto; margin-bottom: 12px;"></div>
                 <div id="channelInputArea" class="hidden" style="display: flex; gap: 8px; padding: 8px 0;">
                     <input type="text" id="channelInput" class="auth-input" placeholder="Написать в канал..." style="margin: 0;">
                     <button id="sendChannelBtn" class="auth-submit" style="width: auto; padding: 0 20px; margin: 0;">➤</button>
@@ -809,6 +902,8 @@
         let token = localStorage.getItem('token');
         let currentUser = null;
         let contacts = [];
+        let messages = {};
+        let currentChat = null;
         let channelMessages = [];
         let socket = null;
         let currentTab = 'contacts';
@@ -851,6 +946,13 @@
         const searchContacts = document.getElementById('searchContacts');
         const addFriendBtn = document.getElementById('addFriendBtn');
         
+        // Чат
+        const chatMessages = document.getElementById('chatMessages');
+        const chatInput = document.getElementById('chatInput');
+        const sendMessageBtn = document.getElementById('sendMessageBtn');
+        const chatName = document.getElementById('chatName');
+        const chatStatus = document.getElementById('chatStatus');
+        
         // Профиль
         const profileAvatar = document.getElementById('profileAvatar');
         const profileName = document.getElementById('profileName');
@@ -879,7 +981,7 @@
         const editProfileConfirm = document.getElementById('editProfileConfirm');
         const editProfileCancel = document.getElementById('editProfileCancel');
 
-        // Элементы уведомлений
+        // Уведомления
         const notificationBell = document.getElementById('notificationBell');
         const notificationCount = document.getElementById('notificationCount');
         let notificationPopup = null;
@@ -914,38 +1016,12 @@
             pendingRequests.push(request);
             updateNotificationBell();
             
-            if (notificationPopup) {
-                notificationPopup.remove();
-            }
-            
-            notificationPopup = document.createElement('div');
-            notificationPopup.className = 'notification-popup';
-            notificationPopup.innerHTML = `
-                <div class="notification-item">
-                    <div class="notification-avatar">${getInitials(request.fromName)}</div>
-                    <div class="notification-content">
-                        <div class="notification-title">${request.fromName}</div>
-                        <div class="notification-text">хочет добавить вас в друзья</div>
-                        <div class="notification-actions">
-                            <button class="notification-btn btn-accept" onclick="acceptRequest('${request.from}')">✓ Принять</button>
-                            <button class="notification-btn btn-decline" onclick="declineRequest('${request.from}')">✗ Отклонить</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(notificationPopup);
-            
-            setTimeout(() => {
-                if (notificationPopup) {
-                    notificationPopup.remove();
-                    notificationPopup = null;
-                }
-            }, 10000);
+            showNotification(`Новая заявка от ${request.fromName}`, 'info');
         }
 
         function updateNotificationBell() {
             if (pendingRequests.length > 0) {
-                notificationBell.style.display = 'flex';
+                notificationBell.style.display = 'block';
                 notificationCount.textContent = pendingRequests.length;
             } else {
                 notificationBell.style.display = 'none';
@@ -955,32 +1031,44 @@
         notificationBell.onclick = () => {
             if (notificationPopup) {
                 notificationPopup.remove();
+                notificationPopup = null;
             }
             
             notificationPopup = document.createElement('div');
-            notificationPopup.className = 'notification-popup';
-            notificationPopup.style.maxHeight = '400px';
-            notificationPopup.style.overflowY = 'auto';
+            notificationPopup.className = 'requests-popup';
             
-            let html = '';
-            pendingRequests.forEach(req => {
-                html += `
-                    <div class="notification-item">
-                        <div class="notification-avatar">${getInitials(req.fromName)}</div>
-                        <div class="notification-content">
-                            <div class="notification-title">${req.fromName}</div>
-                            <div class="notification-text">хочет добавить вас в друзья</div>
-                            <div class="notification-actions">
-                                <button class="notification-btn btn-accept" onclick="acceptRequest('${req.from}')">✓ Принять</button>
-                                <button class="notification-btn btn-decline" onclick="declineRequest('${req.from}')">✗ Отклонить</button>
+            let html = '<h3 style="margin-bottom: 12px;">Заявки в друзья</h3>';
+            
+            if (pendingRequests.length === 0) {
+                html += '<p style="color: var(--text-secondary); text-align: center;">Нет новых заявок</p>';
+            } else {
+                pendingRequests.forEach(req => {
+                    html += `
+                        <div class="request-item">
+                            <div class="request-avatar">${getInitials(req.fromName)}</div>
+                            <div class="request-content">
+                                <div class="request-name">${req.fromName}</div>
+                                <div class="request-text">хочет добавить вас в друзья</div>
+                                <div class="request-actions">
+                                    <button class="request-btn request-btn-accept" onclick="acceptRequest('${req.from}')">✓ Принять</button>
+                                    <button class="request-btn request-btn-decline" onclick="declineRequest('${req.from}')">✗ Отклонить</button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                `;
-            });
+                    `;
+                });
+            }
             
             notificationPopup.innerHTML = html;
             document.body.appendChild(notificationPopup);
+            
+            // Закрыть при клике вне попапа
+            setTimeout(() => {
+                if (notificationPopup) {
+                    notificationPopup.remove();
+                    notificationPopup = null;
+                }
+            }, 10000);
         };
 
         window.acceptRequest = function(requesterId) {
@@ -1020,6 +1108,52 @@
                 showNotification('Заявка отклонена', 'info');
             }
         };
+
+        // ========== ЧАТ ==========
+        function openChat(contact) {
+            currentChat = contact;
+            chatName.textContent = contact.name || contact.username;
+            chatStatus.textContent = contact.status === 'online' ? 'в сети' : 'не в сети';
+            
+            if (!messages[contact.id]) {
+                messages[contact.id] = [];
+            }
+            
+            renderMessages();
+            
+            chatInput.disabled = false;
+            sendMessageBtn.disabled = false;
+            
+            showScreen('chats');
+        }
+
+        function renderMessages() {
+            if (!currentChat) return;
+            
+            chatMessages.innerHTML = '';
+            const chatMessagesList = messages[currentChat.id] || [];
+            
+            chatMessagesList.forEach(msg => {
+                const msgDiv = document.createElement('div');
+                msgDiv.className = `message ${msg.from === currentUser.id ? 'message-mine' : 'message-other'}`;
+                msgDiv.innerHTML = `
+                    <div>${msg.text}</div>
+                    <div class="message-time">${formatTime(msg.timestamp)}</div>
+                `;
+                chatMessages.appendChild(msgDiv);
+            });
+            
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function addMessage(from, to, text, timestamp) {
+            if (!messages[to]) messages[to] = [];
+            messages[to].push({ from, text, timestamp: timestamp || new Date().toISOString() });
+            
+            if (currentChat && currentChat.id === to) {
+                renderMessages();
+            }
+        }
 
         // ========== ПЕРЕКЛЮЧЕНИЕ ЭКРАНОВ ==========
         function showScreen(screenName) {
@@ -1104,7 +1238,7 @@
 
         // ========== WEB SOCKET ==========
         function connectWebSocket() {
-            const wsUrl = 'wss://' + window.location.host;
+            const wsUrl = `wss://${window.location.host}`;
             socket = new WebSocket(wsUrl);
             
             socket.onopen = () => {
@@ -1143,6 +1277,13 @@
                         
                     case 'friend_request_accepted':
                         showNotification(data.message, 'success');
+                        break;
+                        
+                    case 'message':
+                        addMessage(data.from, data.from, data.text, data.timestamp);
+                        if (!currentChat || currentChat.id !== data.from) {
+                            showNotification(`Новое сообщение от ${data.fromName || data.from}`, 'info');
+                        }
                         break;
                         
                     case 'channel_message':
@@ -1216,11 +1357,6 @@
             channelMessagesList.scrollTop = channelMessagesList.scrollHeight;
         }
 
-        function openChat(contact) {
-            showScreen('chats');
-            // Здесь будет логика открытия чата
-        }
-
         // ========== ОБРАБОТЧИКИ ==========
         authButton.onclick = () => showScreen('auth');
         
@@ -1290,6 +1426,28 @@
             showNotification('Профиль обновлен', 'success');
         };
         
+        sendMessageBtn.onclick = () => {
+            if (!socket || !currentChat || !chatInput.value) return;
+            
+            const text = chatInput.value.trim();
+            if (!text) return;
+            
+            socket.send(JSON.stringify({
+                type: 'message',
+                to: currentChat.id,
+                text: text
+            }));
+            
+            addMessage(currentUser.id, currentChat.id, text);
+            chatInput.value = '';
+        };
+        
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessageBtn.click();
+            }
+        });
+        
         sendChannelBtn.onclick = () => {
             if (socket && channelInput.value) {
                 socket.send(JSON.stringify({
@@ -1306,6 +1464,14 @@
             btn.onclick = () => showScreen(btn.dataset.tab);
         });
 
+        // Закрытие попапа при клике вне
+        document.addEventListener('click', (e) => {
+            if (notificationPopup && !notificationPopup.contains(e.target) && e.target !== notificationBell) {
+                notificationPopup.remove();
+                notificationPopup = null;
+            }
+        });
+
         // ========== ИНИЦИАЛИЗАЦИЯ ==========
         if (token) {
             connectWebSocket();
@@ -1316,6 +1482,7 @@
     </script>
 </body>
 </html>
+
 
 
 

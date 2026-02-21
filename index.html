@@ -3043,7 +3043,10 @@
                 
                 let replyHtml = '';
                 if (msg.replyTo) {
-                    replyHtml = `<div class="message-sender">↩️ в ответ на сообщение</div>`;
+                    const repliedMsg = chatMessagesList.find(m => m.id === msg.replyTo);
+                    if (repliedMsg) {
+                        replyHtml = `<div class="message-sender">↩️ в ответ на: ${repliedMsg.text?.substring(0, 30)}${repliedMsg.text?.length > 30 ? '...' : ''}</div>`;
+                    }
                 }
                 
                 let reactionsHtml = '';
@@ -3086,7 +3089,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null) {
+        function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null, replyTo = null) {
             if (blockedUsers.includes(from) && from !== currentUser.id) return;
             if (!messages[to]) messages[to] = [];
             
@@ -3096,18 +3099,14 @@
                 text, 
                 timestamp: timestamp || new Date().toISOString(), 
                 reactions: { users: {} },
-                read: false
+                read: false,
+                replyTo: replyTo
             };
             
             if (fileData) { 
                 message.fileData = fileData; 
                 message.fileName = fileName; 
                 message.fileType = fileType; 
-            }
-            
-            if (replyingTo) {
-                message.replyTo = replyingTo.id;
-                cancelReply();
             }
             
             messages[to].push(message);
@@ -3265,7 +3264,8 @@
                         
                     case 'message':
                         console.log('💬 Новое сообщение от:', data.from);
-                        addMessage(data.from, data.from, data.text, data.timestamp);
+                        // Добавляем сообщение с информацией об ответе
+                        addMessage(data.from, data.from, data.text, data.timestamp, null, null, null, data.replyTo);
                         break;
                         
                     case 'file_message':
@@ -3751,6 +3751,7 @@
             if (!text) return;
             
             if (editingMessage) {
+                // Отправляем редактирование на сервер
                 socket.send(JSON.stringify({
                     type: 'edit_message',
                     chatId: currentChat.id,
@@ -3758,10 +3759,7 @@
                     text: text
                 }));
                 
-                editingMessage.text = text;
-                editingMessage.edited = true;
-                saveMessages();
-                renderMessages();
+                // Не обновляем локально сразу - ждём подтверждения от сервера
                 cancelEdit();
             } else if (currentChat.id === CHANNEL_ID) {
                 if (currentUser.id === ADMIN_ID) {
@@ -3769,20 +3767,35 @@
                         type: 'channel_message', 
                         content: text 
                     }));
-                    addMessage(CHANNEL_ID, CHANNEL_ID, text, new Date().toISOString());
                 } else {
                     showNotification('Только администратор может писать в канал', 'error');
                     return;
                 }
             } else {
+                // Отправляем обычное сообщение с возможным ответом
                 socket.send(JSON.stringify({ 
                     type: 'message', 
                     to: currentChat.id, 
                     text: text,
-                    replyTo: replyingTo?.id
+                    replyTo: replyingTo?.id || null
                 }));
                 
-                addMessage(currentUser.id, currentChat.id, text, new Date().toISOString());
+                // Добавляем сообщение локально для мгновенного отображения
+                const message = {
+                    id: 'msg_' + Date.now() + Math.random(),
+                    from: currentUser.id,
+                    text: text,
+                    timestamp: new Date().toISOString(),
+                    reactions: { users: {} },
+                    replyTo: replyingTo?.id || null
+                };
+                
+                if (!messages[currentChat.id]) messages[currentChat.id] = [];
+                messages[currentChat.id].push(message);
+                saveMessages();
+                renderMessages();
+                
+                if (replyingTo) cancelReply();
             }
             
             chatInput.value = '';
@@ -3835,6 +3848,7 @@
     </script>
 </body>
 </html>
+
 
 
 

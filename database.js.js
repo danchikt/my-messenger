@@ -7,15 +7,18 @@ const db = new sqlite3.Database(dbPath);
 
 // Создаем таблицы, если их нет
 db.serialize(() => {
-    // ===== ТВОИ СТАРЫЕ ТАБЛИЦЫ (оставляем как есть) =====
-    
-    // Таблица пользователей (ДОБАВЛЯЕМ НОВЫЕ ПОЛЯ)
+    // Таблица пользователей
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
+        email TEXT UNIQUE,
+        phone TEXT UNIQUE,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
         bio TEXT DEFAULT '',
         avatar TEXT DEFAULT '',
-        status TEXT DEFAULT 'offline'
+        status TEXT DEFAULT 'offline',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
     // Таблица друзей
@@ -23,7 +26,7 @@ db.serialize(() => {
         user_id TEXT,
         friend_id TEXT,
         status TEXT DEFAULT 'pending',
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         PRIMARY KEY (user_id, friend_id),
         FOREIGN KEY (user_id) REFERENCES users(id),
         FOREIGN KEY (friend_id) REFERENCES users(id)
@@ -39,39 +42,6 @@ db.serialize(() => {
         FOREIGN KEY (from_id) REFERENCES users(id),
         FOREIGN KEY (to_id) REFERENCES users(id)
     )`);
-
-    // ===== НОВЫЕ ТАБЛИЦЫ =====
-
-    // Добавляем колонки в users (если их нет)
-    db.run(`ALTER TABLE users ADD COLUMN email TEXT UNIQUE`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-            console.log('Ошибка добавления email:', err);
-        }
-    });
-    
-    db.run(`ALTER TABLE users ADD COLUMN phone TEXT UNIQUE`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-            console.log('Ошибка добавления phone:', err);
-        }
-    });
-    
-    db.run(`ALTER TABLE users ADD COLUMN username TEXT UNIQUE`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-            console.log('Ошибка добавления username:', err);
-        }
-    });
-    
-    db.run(`ALTER TABLE users ADD COLUMN password_hash TEXT`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-            console.log('Ошибка добавления password_hash:', err);
-        }
-    });
-    
-    db.run(`ALTER TABLE users ADD COLUMN created_at DATETIME DEFAULT CURRENT_TIMESTAMP`, (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-            console.log('Ошибка добавления created_at:', err);
-        }
-    });
 
     // Таблица официального канала
     db.run(`CREATE TABLE IF NOT EXISTS channel_messages (
@@ -105,10 +75,7 @@ db.serialize(() => {
             function(err) {
                 if (!err && this.changes) {
                     console.log('✅ Администратор создан');
-                    // Подписываем админа на канал
                     db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [adminId]);
-                } else if (err) {
-                    console.log('Администратор уже существует или ошибка:', err);
                 }
             }
         );
@@ -149,7 +116,7 @@ function createUser(userData, callback) {
     });
 }
 
-// Поиск пользователя по email/phone/username
+// Поиск пользователя по email/phone/username/id
 function findUser(login, callback) {
     db.get(`SELECT * FROM users WHERE email = ? OR phone = ? OR username = ? OR id = ?`,
         [login, login, login, login], callback);

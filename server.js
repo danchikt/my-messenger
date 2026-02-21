@@ -33,6 +33,15 @@ db.serialize(() => {
         bio TEXT DEFAULT '',
         avatar TEXT DEFAULT '',
         status TEXT DEFAULT 'offline',
+        last_seen DATETIME,
+        privacy_last_seen TEXT DEFAULT 'everyone',
+        privacy_messages TEXT DEFAULT 'everyone',
+        privacy_groups TEXT DEFAULT 'everyone',
+        theme TEXT DEFAULT 'light',
+        accent_color TEXT DEFAULT '#8774e1',
+        notification_sound BOOLEAN DEFAULT 1,
+        notification_vibrate BOOLEAN DEFAULT 1,
+        notification_preview BOOLEAN DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -54,9 +63,36 @@ db.serialize(() => {
         file_data TEXT,
         file_name TEXT,
         file_type TEXT,
+        edited BOOLEAN DEFAULT 0,
+        reply_to INTEGER,
+        forwarded_from TEXT,
+        read BOOLEAN DEFAULT 0,
+        read_at DATETIME,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (from_id) REFERENCES users(id),
-        FOREIGN KEY (to_id) REFERENCES users(id)
+        FOREIGN KEY (to_id) REFERENCES users(id),
+        FOREIGN KEY (reply_to) REFERENCES messages(id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS reactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id TEXT,
+        message_id INTEGER,
+        reaction TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (message_id) REFERENCES messages(id),
+        UNIQUE(user_id, message_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS pinned_messages (
+        chat_id TEXT,
+        message_id INTEGER,
+        pinned_by TEXT,
+        pinned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (message_id) REFERENCES messages(id),
+        FOREIGN KEY (pinned_by) REFERENCES users(id),
+        PRIMARY KEY (chat_id, message_id)
     )`);
 
     db.run(`CREATE TABLE IF NOT EXISTS channel_messages (
@@ -81,6 +117,34 @@ db.serialize(() => {
     db.run(`CREATE TABLE IF NOT EXISTS channel_views (
         user_id TEXT,
         viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS saved_messages (
+        user_id TEXT,
+        message_id INTEGER,
+        saved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (message_id) REFERENCES messages(id),
+        PRIMARY KEY (user_id, message_id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS groups (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        description TEXT,
+        created_by TEXT,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (created_by) REFERENCES users(id)
+    )`);
+
+    db.run(`CREATE TABLE IF NOT EXISTS group_members (
+        group_id TEXT,
+        user_id TEXT,
+        joined_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        role TEXT DEFAULT 'member',
+        PRIMARY KEY (group_id, user_id),
+        FOREIGN KEY (group_id) REFERENCES groups(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
     )`);
 
@@ -114,6 +178,27 @@ function getFriendsList(userId, callback) {
             WHERE (f.user_id = ? OR f.friend_id = ?) 
             AND f.status = 'accepted' AND u.id != ?`,
         [userId, userId, userId], callback);
+}
+
+// Вспомогательная функция для проверки приватности
+function canSeeLastSeen(viewerId, targetId, callback) {
+    db.get(`SELECT privacy_last_seen FROM users WHERE id = ?`, [targetId], (err, user) => {
+        if (err || !user) {
+            callback(false);
+            return;
+        }
+        
+        if (user.privacy_last_seen === 'everyone') {
+            callback(true);
+        } else if (user.privacy_last_seen === 'contacts') {
+            db.get(`SELECT * FROM friends WHERE user_id = ? AND friend_id = ? AND status = 'accepted'`,
+                [targetId, viewerId], (err, friend) => {
+                    callback(!!friend);
+                });
+        } else {
+            callback(false);
+        }
+    });
 }
 
 // ========== HTTP ЭНДПОИНТЫ ==========
@@ -177,6 +262,9 @@ app.post('/api/login', (req, res) => {
                 
                 const token = jwt.sign({ userId: user.id, username: user.username }, JWT_SECRET);
                 
+                // Обновляем last_seen
+                db.run(`UPDATE users SET last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [user.id]);
+                
                 res.json({
                     success: true,
                     token,
@@ -186,7 +274,15 @@ app.post('/api/login', (req, res) => {
                         name: user.name,
                         email: user.email,
                         bio: user.bio,
-                        avatar: user.avatar
+                        avatar: user.avatar,
+                        theme: user.theme,
+                        accent_color: user.accent_color,
+                        privacy_last_seen: user.privacy_last_seen,
+                        privacy_messages: user.privacy_messages,
+                        privacy_groups: user.privacy_groups,
+                        notification_sound: user.notification_sound,
+                        notification_vibrate: user.notification_vibrate,
+                        notification_preview: user.notification_preview
                     }
                 });
             });
@@ -227,7 +323,8 @@ wss.on('connection', (ws) => {
                         
                         clients.set(currentUser.userId, ws);
                         
-                        db.run(`UPDATE users SET status = 'online' WHERE id = ?`, [currentUser.userId]);
+                        // Обновляем статус и last_seen
+                        db.run(`UPDATE users SET status = 'online', last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [currentUser.userId]);
                         
                         // Получаем контакты
                         getFriendsList(currentUser.userId, (err, contacts) => {
@@ -268,23 +365,31 @@ wss.on('connection', (ws) => {
                         break;
                     }
                     
-                    const { to, text } = data;
+                    const { to, text, replyTo } = data;
                     
-                    db.run(`INSERT INTO messages (from_id, to_id, text) VALUES (?, ?, ?)`,
-                        [currentUser.userId, to, text],
+                    db.run(`INSERT INTO messages (from_id, to_id, text, reply_to) VALUES (?, ?, ?, ?)`,
+                        [currentUser.userId, to, text, replyTo],
                         function(err) {
                             if (!err) {
-                                const targetSocket = clients.get(to);
-                                if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
-                                    targetSocket.send(JSON.stringify({
-                                        type: 'message',
-                                        from: currentUser.userId,
-                                        fromName: currentUser.username,
-                                        text: text,
-                                        timestamp: new Date().toISOString(),
-                                        messageId: this.lastID
-                                    }));
-                                }
+                                const messageId = this.lastID;
+                                
+                                // Получаем полное сообщение с данными
+                                db.get(`SELECT * FROM messages WHERE id = ?`, [messageId], (err, message) => {
+                                    if (message) {
+                                        const targetSocket = clients.get(to);
+                                        if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
+                                            targetSocket.send(JSON.stringify({
+                                                type: 'message',
+                                                from: currentUser.userId,
+                                                fromName: currentUser.username,
+                                                text: text,
+                                                timestamp: message.timestamp,
+                                                messageId: messageId,
+                                                replyTo: replyTo
+                                            }));
+                                        }
+                                    }
+                                });
                             }
                         }
                     );
@@ -339,7 +444,6 @@ wss.on('connection', (ws) => {
                             }
                             
                             const messageId = this.lastID;
-                            console.log(`✅ Сообщение сохранено в канал, ID: ${messageId}`);
                             
                             const message = {
                                 type: 'channel_message',
@@ -355,15 +459,13 @@ wss.on('connection', (ws) => {
                                 message.fileType = channelFileType;
                             }
                             
-                            // Рассылаем ВСЕМ подписчикам
+                            // Рассылаем всем подписчикам
                             clients.forEach((client, userId) => {
                                 if (client && client.readyState === WebSocket.OPEN) {
                                     client.send(JSON.stringify(message));
-                                    console.log(`📢 Отправлено пользователю ${userId}`);
                                 }
                             });
                             
-                            // Отправляем подтверждение админу
                             ws.send(JSON.stringify({
                                 type: 'channel_message_sent',
                                 messageId: messageId,
@@ -418,7 +520,6 @@ wss.on('connection', (ws) => {
                             WHERE user_id = ? AND friend_id = ?`,
                         [requesterId, currentUser.userId], function(err) {
                             if (!err) {
-                                // Отправляем обновлённый список ТОМУ, КТО ПРИНЯЛ (текущий пользователь)
                                 getFriendsList(currentUser.userId, (err, contacts) => {
                                     ws.send(JSON.stringify({ 
                                         type: 'friends_list', 
@@ -426,7 +527,6 @@ wss.on('connection', (ws) => {
                                     }));
                                 });
                                 
-                                // Отправляем обновлённый список ТОМУ, КТО ОТПРАВИЛ ЗАЯВКУ (requesterId)
                                 const requesterWs = clients.get(requesterId);
                                 if (requesterWs) {
                                     getFriendsList(requesterId, (err, contacts) => {
@@ -463,7 +563,6 @@ wss.on('connection', (ws) => {
                     db.run(`DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)`,
                         [currentUser.userId, deleteId, deleteId, currentUser.userId]);
                     
-                    // Обновляем списки у обоих
                     getFriendsList(currentUser.userId, (err, contacts) => {
                         ws.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
                     });
@@ -484,9 +583,6 @@ wss.on('connection', (ws) => {
                     db.run(`DELETE FROM messages WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)`,
                         [currentUser.userId, chatId, chatId, currentUser.userId], function(err) {
                             if (!err) {
-                                console.log(`✅ Чат ${chatId} очищен от сообщений`);
-                                
-                                // Отправляем уведомление об очистке обоим пользователям
                                 const targetSocket = clients.get(chatId);
                                 if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
                                     targetSocket.send(JSON.stringify({
@@ -496,7 +592,6 @@ wss.on('connection', (ws) => {
                                     }));
                                 }
                                 
-                                // Отправляем подтверждение инициатору
                                 ws.send(JSON.stringify({
                                     type: 'chat_cleared',
                                     chatId: chatId,
@@ -511,9 +606,6 @@ wss.on('connection', (ws) => {
                     
                     db.run(`DELETE FROM channel_messages`, function(err) {
                         if (!err) {
-                            console.log('✅ Канал очищен');
-                            
-                            // Уведомляем всех подписчиков
                             clients.forEach((client, userId) => {
                                 if (client && client.readyState === WebSocket.OPEN) {
                                     client.send(JSON.stringify({
@@ -528,10 +620,14 @@ wss.on('connection', (ws) => {
                 case 'update_profile':
                     if (!currentUser) break;
                     
-                    const { name, bio, avatar } = data;
+                    const { name, bio, avatar, theme, accent_color, privacy_last_seen, privacy_messages, privacy_groups, notification_sound, notification_vibrate, notification_preview } = data;
                     
-                    db.run(`UPDATE users SET name = ?, bio = ?, avatar = ? WHERE id = ?`,
-                        [name, bio, avatar, currentUser.userId]);
+                    db.run(`UPDATE users SET name = ?, bio = ?, avatar = ?, theme = ?, accent_color = ?, 
+                            privacy_last_seen = ?, privacy_messages = ?, privacy_groups = ?,
+                            notification_sound = ?, notification_vibrate = ?, notification_preview = ?
+                            WHERE id = ?`,
+                        [name, bio, avatar, theme, accent_color, privacy_last_seen, privacy_messages, privacy_groups,
+                         notification_sound, notification_vibrate, notification_preview, currentUser.userId]);
                     break;
 
                 case 'get_channel_stats':
@@ -557,14 +653,15 @@ wss.on('connection', (ws) => {
                     
                     const { group } = data;
                     
-                    // Сохраняем группу в памяти (в реальном проекте нужно в БД)
-                    groups.push(group);
+                    db.run(`INSERT INTO groups (id, name, description, created_by) VALUES (?, ?, ?, ?)`,
+                        [group.id, group.name, group.description, currentUser.userId]);
                     
-                    // Уведомляем всех участников
-                    group.members.forEach(memberId => {
-                        const memberWs = clients.get(memberId);
-                        if (memberWs) {
-                            memberWs.send(JSON.stringify({
+                    db.run(`INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'creator')`,
+                        [group.id, currentUser.userId]);
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN && group.members.includes(userId)) {
+                            client.send(JSON.stringify({
                                 type: 'group_created',
                                 group: group
                             }));
@@ -577,11 +674,14 @@ wss.on('connection', (ws) => {
                     
                     const { groupId, members } = data;
                     
-                    // Уведомляем новых участников
                     members.forEach(memberId => {
-                        const memberWs = clients.get(memberId);
-                        if (memberWs) {
-                            memberWs.send(JSON.stringify({
+                        db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)`,
+                            [groupId, memberId]);
+                    });
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN && members.includes(userId)) {
+                            client.send(JSON.stringify({
                                 type: 'group_members_added',
                                 groupId: groupId,
                                 members: members
@@ -595,7 +695,9 @@ wss.on('connection', (ws) => {
                     
                     const { groupId: kickGroupId, memberId } = data;
                     
-                    // Уведомляем исключённого
+                    db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`,
+                        [kickGroupId, memberId]);
+                    
                     const kickedWs = clients.get(memberId);
                     if (kickedWs) {
                         kickedWs.send(JSON.stringify({
@@ -611,7 +713,9 @@ wss.on('connection', (ws) => {
                     
                     const { groupId: deleteGroupId } = data;
                     
-                    // Уведомляем всех участников
+                    db.run(`DELETE FROM group_members WHERE group_id = ?`, [deleteGroupId]);
+                    db.run(`DELETE FROM groups WHERE id = ?`, [deleteGroupId]);
+                    
                     clients.forEach((client, userId) => {
                         if (client && client.readyState === WebSocket.OPEN) {
                             client.send(JSON.stringify({
@@ -627,7 +731,9 @@ wss.on('connection', (ws) => {
                     
                     const { groupId: leaveGroupId } = data;
                     
-                    // Уведомляем остальных участников
+                    db.run(`DELETE FROM group_members WHERE group_id = ? AND user_id = ?`,
+                        [leaveGroupId, currentUser.userId]);
+                    
                     clients.forEach((client, userId) => {
                         if (client && client.readyState === WebSocket.OPEN && userId !== currentUser.userId) {
                             client.send(JSON.stringify({
@@ -642,24 +748,149 @@ wss.on('connection', (ws) => {
                 case 'reaction':
                     if (!currentUser) break;
                     
-                    const reactionData = data;
+                    const { chatId, messageId, reaction, remove } = data;
                     
-                    // Рассылаем реакцию всем в чате
+                    if (remove) {
+                        db.run(`DELETE FROM reactions WHERE user_id = ? AND message_id = ?`,
+                            [currentUser.userId, messageId]);
+                    } else {
+                        db.run(`INSERT OR REPLACE INTO reactions (user_id, message_id, reaction) VALUES (?, ?, ?)`,
+                            [currentUser.userId, messageId, reaction]);
+                    }
+                    
+                    // Рассылаем всем в чате
                     clients.forEach((client, userId) => {
                         if (client && client.readyState === WebSocket.OPEN) {
                             client.send(JSON.stringify({
                                 type: 'reaction',
-                                chatId: reactionData.chatId,
-                                messageId: reactionData.messageId,
-                                reaction: reactionData.reaction,
-                                userId: currentUser.userId
+                                chatId: chatId,
+                                messageId: messageId,
+                                reaction: reaction,
+                                userId: currentUser.userId,
+                                remove: remove
                             }));
                         }
                     });
                     break;
+
+                case 'pin_message':
+                    if (!currentUser) break;
                     
-                default:
-                    console.log('❓ Неизвестный тип сообщения:', data.type);
+                    const { chatId: pinChatId, message: pinMessage } = data;
+                    
+                    db.run(`INSERT OR REPLACE INTO pinned_messages (chat_id, message_id, pinned_by) VALUES (?, ?, ?)`,
+                        [pinChatId, pinMessage.id, currentUser.userId]);
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                type: 'pin_message',
+                                chatId: pinChatId,
+                                message: pinMessage
+                            }));
+                        }
+                    });
+                    break;
+
+                case 'unpin_message':
+                    if (!currentUser) break;
+                    
+                    const { chatId: unpinChatId } = data;
+                    
+                    db.run(`DELETE FROM pinned_messages WHERE chat_id = ?`, [unpinChatId]);
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                type: 'unpin_message',
+                                chatId: unpinChatId
+                            }));
+                        }
+                    });
+                    break;
+
+                case 'edit_message':
+                    if (!currentUser) break;
+                    
+                    const { chatId: editChatId, messageId: editMessageId, text: newText } = data;
+                    
+                    db.run(`UPDATE messages SET text = ?, edited = 1 WHERE id = ? AND from_id = ?`,
+                        [newText, editMessageId, currentUser.userId]);
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                type: 'edit_message',
+                                chatId: editChatId,
+                                messageId: editMessageId,
+                                text: newText
+                            }));
+                        }
+                    });
+                    break;
+
+                case 'delete_message':
+                    if (!currentUser) break;
+                    
+                    const { chatId: deleteChatId, messageId: deleteMessageId, forEveryone } = data;
+                    
+                    if (forEveryone) {
+                        db.run(`DELETE FROM messages WHERE id = ?`, [deleteMessageId]);
+                    } else {
+                        // TODO: удалить только у себя
+                    }
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN) {
+                            client.send(JSON.stringify({
+                                type: 'delete_message',
+                                chatId: deleteChatId,
+                                messageId: deleteMessageId
+                            }));
+                        }
+                    });
+                    break;
+
+                case 'typing':
+                    if (!currentUser) break;
+                    
+                    const { chatId: typingChatId } = data;
+                    
+                    const targetSocket = clients.get(typingChatId);
+                    if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
+                        targetSocket.send(JSON.stringify({
+                            type: 'typing',
+                            chatId: currentUser.userId,
+                            userId: currentUser.userId
+                        }));
+                    }
+                    break;
+
+                case 'save_message':
+                    if (!currentUser) break;
+                    
+                    const { messageId: saveMessageId } = data;
+                    
+                    db.run(`INSERT OR IGNORE INTO saved_messages (user_id, message_id) VALUES (?, ?)`,
+                        [currentUser.userId, saveMessageId]);
+                    break;
+
+                case 'mark_read':
+                    if (!currentUser) break;
+                    
+                    const { chatId: readChatId, messageId: readMessageId } = data;
+                    
+                    db.run(`UPDATE messages SET read = 1, read_at = CURRENT_TIMESTAMP WHERE id = ?`, [readMessageId]);
+                    
+                    const readTargetSocket = clients.get(readChatId);
+                    if (readTargetSocket && readTargetSocket.readyState === WebSocket.OPEN) {
+                        readTargetSocket.send(JSON.stringify({
+                            type: 'message_read',
+                            chatId: currentUser.userId,
+                            messageId: readMessageId
+                        }));
+                    }
+                    break;
             }
         } catch (e) {
             console.log('❌ Ошибка:', e);
@@ -669,7 +900,7 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         if (currentUser) {
             clients.delete(currentUser.userId);
-            db.run(`UPDATE users SET status = 'offline' WHERE id = ?`, [currentUser.userId]);
+            db.run(`UPDATE users SET status = 'offline', last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [currentUser.userId]);
             console.log(`👋 ${currentUser.username} отключился`);
         }
     });

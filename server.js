@@ -6,8 +6,6 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
-const admin = require('firebase-admin');
-const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
@@ -19,26 +17,12 @@ const JWT_SECRET = 'your-secret-key-change-this';
 const ADMIN_EMAIL = 'loling601@gmail.com';
 const ADMIN_ID = 'admin';
 
-// Инициализация Firebase Admin
-let firebaseInitialized = false;
-try {
-    const serviceAccount = require('./firebase-service-account.json');
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-    firebaseInitialized = true;
-    console.log('✅ Firebase Admin инициализирован');
-} catch (e) {
-    console.log('⚠️ Firebase не настроен (пропускаем)');
-}
-
 // База данных
 const dbPath = path.join(__dirname, 'messenger.db');
 const db = new sqlite3.Database(dbPath);
 
 // Создаём таблицы
 db.serialize(() => {
-    // Таблица пользователей
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -58,11 +42,9 @@ db.serialize(() => {
         notification_sound BOOLEAN DEFAULT 1,
         notification_vibrate BOOLEAN DEFAULT 1,
         notification_preview BOOLEAN DEFAULT 1,
-        invisible_mode BOOLEAN DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
-    // Таблица друзей/контактов
     db.run(`CREATE TABLE IF NOT EXISTS friends (
         user_id TEXT,
         friend_id TEXT,
@@ -73,7 +55,6 @@ db.serialize(() => {
         FOREIGN KEY (friend_id) REFERENCES users(id)
     )`);
 
-    // Таблица сообщений
     db.run(`CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         from_id TEXT,
@@ -87,15 +68,12 @@ db.serialize(() => {
         forwarded_from TEXT,
         read BOOLEAN DEFAULT 0,
         read_at DATETIME,
-        self_destruct BOOLEAN DEFAULT 0,
-        self_destruct_time INTEGER,
         timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (from_id) REFERENCES users(id),
         FOREIGN KEY (to_id) REFERENCES users(id),
         FOREIGN KEY (reply_to) REFERENCES messages(id)
     )`);
 
-    // Таблица реакций
     db.run(`CREATE TABLE IF NOT EXISTS reactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT,
@@ -107,7 +85,6 @@ db.serialize(() => {
         UNIQUE(user_id, message_id)
     )`);
 
-    // Таблица закреплённых сообщений
     db.run(`CREATE TABLE IF NOT EXISTS pinned_messages (
         chat_id TEXT,
         message_id INTEGER,
@@ -118,7 +95,6 @@ db.serialize(() => {
         PRIMARY KEY (chat_id, message_id)
     )`);
 
-    // Таблица канала
     db.run(`CREATE TABLE IF NOT EXISTS channel_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         content TEXT NOT NULL,
@@ -127,12 +103,10 @@ db.serialize(() => {
         file_data TEXT,
         file_name TEXT,
         file_type TEXT,
-        views INTEGER DEFAULT 0,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (author_id) REFERENCES users(id)
     )`);
 
-    // Таблица подписчиков канала
     db.run(`CREATE TABLE IF NOT EXISTS channel_subscribers (
         user_id TEXT,
         subscribed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -140,25 +114,12 @@ db.serialize(() => {
         PRIMARY KEY (user_id)
     )`);
 
-    // Таблица просмотров канала
     db.run(`CREATE TABLE IF NOT EXISTS channel_views (
         user_id TEXT,
         viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
     )`);
 
-    // Таблица комментариев к постам канала
-    db.run(`CREATE TABLE IF NOT EXISTS channel_comments (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        message_id INTEGER,
-        user_id TEXT,
-        text TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (message_id) REFERENCES channel_messages(id),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    // Таблица сохранённых сообщений
     db.run(`CREATE TABLE IF NOT EXISTS saved_messages (
         user_id TEXT,
         message_id INTEGER,
@@ -168,18 +129,15 @@ db.serialize(() => {
         PRIMARY KEY (user_id, message_id)
     )`);
 
-    // Таблица групп
     db.run(`CREATE TABLE IF NOT EXISTS groups (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         description TEXT,
         created_by TEXT,
-        welcome_message TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (created_by) REFERENCES users(id)
     )`);
 
-    // Таблица участников групп
     db.run(`CREATE TABLE IF NOT EXISTS group_members (
         group_id TEXT,
         user_id TEXT,
@@ -188,104 +146,6 @@ db.serialize(() => {
         PRIMARY KEY (group_id, user_id),
         FOREIGN KEY (group_id) REFERENCES groups(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    // Таблица голосований в группах
-    db.run(`CREATE TABLE IF NOT EXISTS group_polls (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        group_id TEXT,
-        created_by TEXT,
-        question TEXT NOT NULL,
-        options TEXT NOT NULL,
-        multiple BOOLEAN DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (group_id) REFERENCES groups(id),
-        FOREIGN KEY (created_by) REFERENCES users(id)
-    )`);
-
-    // Таблица ответов на голосования
-    db.run(`CREATE TABLE IF NOT EXISTS poll_votes (
-        poll_id INTEGER,
-        user_id TEXT,
-        option_index INTEGER,
-        voted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (poll_id, user_id),
-        FOREIGN KEY (poll_id) REFERENCES group_polls(id),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    // Таблица закреплённых контактов
-    db.run(`CREATE TABLE IF NOT EXISTS pinned_contacts (
-        user_id TEXT,
-        contact_id TEXT,
-        pinned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (user_id, contact_id),
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (contact_id) REFERENCES users(id)
-    )`);
-
-    // Таблица заблокированных пользователей
-    db.run(`CREATE TABLE IF NOT EXISTS blocked_users (
-        user_id TEXT,
-        blocked_id TEXT,
-        blocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        PRIMARY KEY (user_id, blocked_id),
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        FOREIGN KEY (blocked_id) REFERENCES users(id)
-    )`);
-
-    // Таблица FCM токенов
-    db.run(`CREATE TABLE IF NOT EXISTS fcm_tokens (
-        user_id TEXT,
-        token TEXT UNIQUE,
-        device TEXT DEFAULT 'android',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id),
-        PRIMARY KEY (user_id, token)
-    )`);
-
-    // Таблица стикеров
-    db.run(`CREATE TABLE IF NOT EXISTS stickers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        image_url TEXT NOT NULL,
-        pack_name TEXT,
-        animated BOOLEAN DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`);
-
-    // Таблица историй
-    db.run(`CREATE TABLE IF NOT EXISTS stories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id TEXT,
-        image_url TEXT,
-        text TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        expires_at DATETIME DEFAULT (datetime('now', '+24 hours')),
-        views INTEGER DEFAULT 0,
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    // Таблица просмотров историй
-    db.run(`CREATE TABLE IF NOT EXISTS story_views (
-        story_id INTEGER,
-        user_id TEXT,
-        viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        reaction TEXT,
-        PRIMARY KEY (story_id, user_id),
-        FOREIGN KEY (story_id) REFERENCES stories(id),
-        FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    // Таблица ботов
-    db.run(`CREATE TABLE IF NOT EXISTS bots (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        token TEXT UNIQUE NOT NULL,
-        owner_id TEXT,
-        webhook_url TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (owner_id) REFERENCES users(id)
     )`);
 
     // Создаём админа
@@ -311,129 +171,35 @@ app.use(express.json({ limit: '50mb' }));
 // Хранилище активных WebSocket соединений
 const clients = new Map();
 
-// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
-
-// Получить список друзей
+// Вспомогательная функция для получения списка друзей
 function getFriendsList(userId, callback) {
-    db.all(`SELECT u.*, f.status as friend_status 
-            FROM users u
+    db.all(`SELECT u.* FROM users u
             JOIN friends f ON (f.friend_id = u.id OR f.user_id = u.id)
             WHERE (f.user_id = ? OR f.friend_id = ?) 
             AND f.status = 'accepted' AND u.id != ?`,
-        [userId, userId, userId], (err, friends) => {
-            if (err) {
-                console.error('Ошибка получения друзей:', err);
-                callback([]);
-                return;
-            }
-            callback(friends || []);
-        });
+        [userId, userId, userId], callback);
 }
 
-// Получить заблокированных пользователей
-function getBlockedUsers(userId, callback) {
-    db.all(`SELECT blocked_id FROM blocked_users WHERE user_id = ?`, [userId], (err, blocked) => {
-        if (err) {
-            console.error('Ошибка получения заблокированных:', err);
-            callback([]);
+// Вспомогательная функция для проверки приватности
+function canSeeLastSeen(viewerId, targetId, callback) {
+    db.get(`SELECT privacy_last_seen FROM users WHERE id = ?`, [targetId], (err, user) => {
+        if (err || !user) {
+            callback(false);
             return;
         }
-        callback(blocked.map(b => b.blocked_id));
-    });
-}
-
-// Получить закреплённые контакты
-function getPinnedContacts(userId, callback) {
-    db.all(`SELECT contact_id FROM pinned_contacts WHERE user_id = ?`, [userId], (err, pinned) => {
-        if (err) {
-            console.error('Ошибка получения закреплённых:', err);
-            callback([]);
-            return;
-        }
-        callback(pinned.map(p => p.contact_id));
-    });
-}
-
-// Получить группы пользователя
-function getUserGroups(userId, callback) {
-    db.all(`SELECT g.* FROM groups g
-            JOIN group_members gm ON gm.group_id = g.id
-            WHERE gm.user_id = ?`, [userId], (err, groups) => {
-        if (err) {
-            console.error('Ошибка получения групп:', err);
-            callback([]);
-            return;
-        }
-        callback(groups || []);
-    });
-}
-
-// Получить участников группы
-function getGroupMembers(groupId, callback) {
-    db.all(`SELECT user_id FROM group_members WHERE group_id = ?`, [groupId], (err, members) => {
-        if (err) {
-            console.error('Ошибка получения участников группы:', err);
-            callback([]);
-            return;
-        }
-        callback(members.map(m => m.user_id));
-    });
-}
-
-// Получить подписчиков канала
-function getChannelSubscribers(callback) {
-    db.all(`SELECT user_id FROM channel_subscribers`, [], (err, subscribers) => {
-        if (err) {
-            callback([]);
-            return;
-        }
-        callback(subscribers.map(s => s.user_id));
-    });
-}
-
-// Отправка PUSH-уведомления
-async function sendPushNotification(userId, title, body, data = {}) {
-    if (!firebaseInitialized) return false;
-    
-    return new Promise((resolve) => {
-        db.all(`SELECT token FROM fcm_tokens WHERE user_id = ?`, [userId], (err, tokens) => {
-            if (err || !tokens || tokens.length === 0) {
-                resolve(false);
-                return;
-            }
-            
-            const message = {
-                notification: { 
-                    title, 
-                    body,
-                    sound: 'default',
-                    click_action: 'FLUTTER_NOTIFICATION_CLICK'
-                },
-                data: {
-                    ...data,
-                    click_action: 'FLUTTER_NOTIFICATION_CLICK'
-                },
-                tokens: tokens.map(t => t.token)
-            };
-            
-            admin.messaging().sendEachForMulticast(message)
-                .then(response => {
-                    console.log(`✅ Уведомление отправлено ${response.successCount} устройствам`);
-                    resolve(true);
-                })
-                .catch(error => {
-                    console.error('❌ Ошибка отправки:', error);
-                    resolve(false);
+        
+        if (user.privacy_last_seen === 'everyone') {
+            callback(true);
+        } else if (user.privacy_last_seen === 'contacts') {
+            db.get(`SELECT * FROM friends WHERE user_id = ? AND friend_id = ? AND status = 'accepted'`,
+                [targetId, viewerId], (err, friend) => {
+                    callback(!!friend);
                 });
-        });
+        } else {
+            callback(false);
+        }
     });
 }
-
-// Проверка самоуничтожающихся сообщений
-setInterval(() => {
-    db.run(`DELETE FROM messages WHERE self_destruct = 1 AND 
-            datetime(timestamp, '+' || self_destruct_time || ' seconds') < datetime('now')`);
-}, 60000); // Проверка каждую минуту
 
 // ========== HTTP ЭНДПОИНТЫ ==========
 
@@ -463,13 +229,12 @@ app.post('/api/register', async (req, res) => {
                 
                 const token = jwt.sign({ userId, username }, JWT_SECRET);
                 
-                // Подписываем на канал
                 db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [userId]);
                 
                 res.json({ 
                     success: true, 
                     token,
-                    user: { id: userId, username, email, name: name || username, bio: bio || '' }
+                    user: { id: userId, username, email }
                 });
             }
         );
@@ -517,8 +282,7 @@ app.post('/api/login', (req, res) => {
                         privacy_groups: user.privacy_groups,
                         notification_sound: user.notification_sound,
                         notification_vibrate: user.notification_vibrate,
-                        notification_preview: user.notification_preview,
-                        invisible_mode: user.invisible_mode
+                        notification_preview: user.notification_preview
                     }
                 });
             });
@@ -535,25 +299,6 @@ app.get('/api/channel/stats', (req, res) => {
                 views: viewsResult?.views || 0
             });
         });
-    });
-});
-
-// Получить все стикеры
-app.get('/api/stickers', (req, res) => {
-    db.all(`SELECT * FROM stickers`, [], (err, stickers) => {
-        res.json(stickers || []);
-    });
-});
-
-// Получить активные истории
-app.get('/api/stories', (req, res) => {
-    db.all(`SELECT s.*, u.name as user_name, u.avatar as user_avatar,
-            (SELECT COUNT(*) FROM story_views WHERE story_id = s.id) as views_count
-            FROM stories s
-            JOIN users u ON u.id = s.user_id
-            WHERE expires_at > datetime('now')
-            ORDER BY created_at DESC`, [], (err, stories) => {
-        res.json(stories || []);
     });
 });
 
@@ -578,31 +323,18 @@ wss.on('connection', (ws) => {
                         
                         clients.set(currentUser.userId, ws);
                         
-                        // Обновляем статус и last_seen (если не невидимка)
-                        db.get(`SELECT invisible_mode FROM users WHERE id = ?`, [currentUser.userId], (err, user) => {
-                            if (!err && user && !user.invisible_mode) {
-                                db.run(`UPDATE users SET status = 'online', last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [currentUser.userId]);
-                            }
-                        });
+                        // Обновляем статус и last_seen
+                        db.run(`UPDATE users SET status = 'online', last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [currentUser.userId]);
                         
-                        // Получаем все данные пользователя
-                        Promise.all([
-                            new Promise(resolve => getFriendsList(currentUser.userId, resolve)),
-                            new Promise(resolve => getBlockedUsers(currentUser.userId, resolve)),
-                            new Promise(resolve => getPinnedContacts(currentUser.userId, resolve)),
-                            new Promise(resolve => getUserGroups(currentUser.userId, resolve))
-                        ]).then(([friends, blocked, pinned, groups]) => {
+                        // Получаем контакты
+                        getFriendsList(currentUser.userId, (err, contacts) => {
                             ws.send(JSON.stringify({
                                 type: 'auth_success',
                                 user: currentUser,
-                                contacts: friends,
-                                blocked: blocked,
-                                pinnedContacts: pinned,
-                                groups: groups
+                                contacts: contacts || []
                             }));
                         });
                         
-                        // Подписываем на канал
                         db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [currentUser.userId]);
                         
                         // Отправляем последние сообщения канала
@@ -616,9 +348,7 @@ wss.on('connection', (ws) => {
                                         timestamp: msg.created_at,
                                         fileData: msg.file_data,
                                         fileName: msg.file_name,
-                                        fileType: msg.file_type,
-                                        messageId: msg.id,
-                                        views: msg.views
+                                        fileType: msg.file_type
                                     }));
                                 });
                             }
@@ -629,30 +359,21 @@ wss.on('connection', (ws) => {
                     }
                     break;
 
-                case 'register_fcm':
-                    if (!currentUser) break;
-                    
-                    const { token: fcmToken, device } = data;
-                    
-                    db.run(`INSERT OR REPLACE INTO fcm_tokens (user_id, token, device) VALUES (?, ?, ?)`,
-                        [currentUser.userId, fcmToken, device || 'android']);
-                    break;
-
                 case 'message':
                     if (!currentUser) {
                         ws.send(JSON.stringify({ type: 'error', message: 'Не авторизован' }));
                         break;
                     }
                     
-                    const { to, text, replyTo, selfDestruct, selfDestructTime } = data;
+                    const { to, text, replyTo } = data;
                     
-                    db.run(`INSERT INTO messages (from_id, to_id, text, reply_to, self_destruct, self_destruct_time) 
-                            VALUES (?, ?, ?, ?, ?, ?)`,
-                        [currentUser.userId, to, text, replyTo, selfDestruct || false, selfDestructTime || 0],
+                    db.run(`INSERT INTO messages (from_id, to_id, text, reply_to) VALUES (?, ?, ?, ?)`,
+                        [currentUser.userId, to, text, replyTo],
                         function(err) {
                             if (!err) {
                                 const messageId = this.lastID;
                                 
+                                // Получаем полное сообщение с данными
                                 db.get(`SELECT * FROM messages WHERE id = ?`, [messageId], (err, message) => {
                                     if (message) {
                                         const targetSocket = clients.get(to);
@@ -664,21 +385,8 @@ wss.on('connection', (ws) => {
                                                 text: text,
                                                 timestamp: message.timestamp,
                                                 messageId: messageId,
-                                                replyTo: replyTo,
-                                                selfDestruct: selfDestruct
+                                                replyTo: replyTo
                                             }));
-                                        } else {
-                                            // Отправляем PUSH-уведомление
-                                            sendPushNotification(
-                                                to,
-                                                currentUser.username,
-                                                text.length > 50 ? text.substring(0, 50) + '...' : text,
-                                                { 
-                                                    chatId: currentUser.userId, 
-                                                    messageId: messageId.toString(),
-                                                    type: 'message'
-                                                }
-                                            );
                                         }
                                     }
                                 });
@@ -696,7 +404,6 @@ wss.on('connection', (ws) => {
                         [currentUser.userId, fileTo, fileData, fileName, fileType],
                         function(err) {
                             if (!err) {
-                                const messageId = this.lastID;
                                 const targetSocket = clients.get(fileTo);
                                 if (targetSocket && targetSocket.readyState === WebSocket.OPEN) {
                                     targetSocket.send(JSON.stringify({
@@ -706,16 +413,8 @@ wss.on('connection', (ws) => {
                                         fileName: fileName,
                                         fileType: fileType,
                                         fileData: fileData,
-                                        timestamp: new Date().toISOString(),
-                                        messageId: messageId
+                                        timestamp: new Date().toISOString()
                                     }));
-                                } else {
-                                    sendPushNotification(
-                                        fileTo,
-                                        currentUser.username,
-                                        '📎 Отправил(а) файл',
-                                        { chatId: currentUser.userId, type: 'file' }
-                                    );
                                 }
                             }
                         }
@@ -761,20 +460,10 @@ wss.on('connection', (ws) => {
                             }
                             
                             // Рассылаем всем подписчикам
-                            getChannelSubscribers((subscribers) => {
-                                subscribers.forEach(userId => {
-                                    const subscriberWs = clients.get(userId);
-                                    if (subscriberWs && subscriberWs.readyState === WebSocket.OPEN) {
-                                        subscriberWs.send(JSON.stringify(message));
-                                    } else {
-                                        sendPushNotification(
-                                            userId,
-                                            'Clock Messenger',
-                                            content || '📢 Новый пост в канале',
-                                            { type: 'channel', messageId: messageId.toString() }
-                                        );
-                                    }
-                                });
+                            clients.forEach((client, userId) => {
+                                if (client && client.readyState === WebSocket.OPEN) {
+                                    client.send(JSON.stringify(message));
+                                }
                             });
                             
                             ws.send(JSON.stringify({
@@ -784,39 +473,6 @@ wss.on('connection', (ws) => {
                             }));
                         }
                     );
-                    break;
-
-                case 'channel_comment':
-                    if (!currentUser) break;
-                    
-                    const { messageId: channelMessageId, commentText } = data;
-                    
-                    db.run(`INSERT INTO channel_comments (message_id, user_id, text) VALUES (?, ?, ?)`,
-                        [channelMessageId, currentUser.userId, commentText], function(err) {
-                            if (!err) {
-                                const commentId = this.lastID;
-                                
-                                // Уведомляем админа
-                                if (currentUser.userId !== ADMIN_ID) {
-                                    sendPushNotification(
-                                        ADMIN_ID,
-                                        currentUser.username,
-                                        `💬 Комментарий: ${commentText.substring(0, 30)}...`,
-                                        { type: 'channel_comment', messageId: channelMessageId.toString() }
-                                    );
-                                }
-                                
-                                ws.send(JSON.stringify({
-                                    type: 'comment_added',
-                                    commentId: commentId,
-                                    messageId: channelMessageId,
-                                    text: commentText,
-                                    userId: currentUser.userId,
-                                    username: currentUser.username,
-                                    timestamp: new Date().toISOString()
-                                }));
-                            }
-                        });
                     break;
 
                 case 'add_friend':
@@ -845,13 +501,6 @@ wss.on('connection', (ws) => {
                                             from: currentUser.userId,
                                             fromName: currentUser.username
                                         }));
-                                    } else {
-                                        sendPushNotification(
-                                            friend.id,
-                                            currentUser.username,
-                                            'Хочет добавить вас в друзья',
-                                            { type: 'friend_request', from: currentUser.userId }
-                                        );
                                     }
                                     
                                     ws.send(JSON.stringify({ 
@@ -871,7 +520,7 @@ wss.on('connection', (ws) => {
                             WHERE user_id = ? AND friend_id = ?`,
                         [requesterId, currentUser.userId], function(err) {
                             if (!err) {
-                                getFriendsList(currentUser.userId, (contacts) => {
+                                getFriendsList(currentUser.userId, (err, contacts) => {
                                     ws.send(JSON.stringify({ 
                                         type: 'friends_list', 
                                         friends: contacts 
@@ -880,7 +529,7 @@ wss.on('connection', (ws) => {
                                 
                                 const requesterWs = clients.get(requesterId);
                                 if (requesterWs) {
-                                    getFriendsList(requesterId, (contacts) => {
+                                    getFriendsList(requesterId, (err, contacts) => {
                                         requesterWs.send(JSON.stringify({ 
                                             type: 'friends_list', 
                                             friends: contacts 
@@ -892,13 +541,6 @@ wss.on('connection', (ws) => {
                                         by: currentUser.userId,
                                         message: `Пользователь ${currentUser.username} принял вашу заявку`
                                     }));
-                                } else {
-                                    sendPushNotification(
-                                        requesterId,
-                                        currentUser.username,
-                                        'Принял(а) вашу заявку в друзья',
-                                        { type: 'friend_accepted' }
-                                    );
                                 }
                             }
                         });
@@ -921,71 +563,16 @@ wss.on('connection', (ws) => {
                     db.run(`DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)`,
                         [currentUser.userId, deleteId, deleteId, currentUser.userId]);
                     
-                    getFriendsList(currentUser.userId, (contacts) => {
+                    getFriendsList(currentUser.userId, (err, contacts) => {
                         ws.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
                     });
                     
                     const deletedFriendWs = clients.get(deleteId);
                     if (deletedFriendWs) {
-                        getFriendsList(deleteId, (contacts) => {
+                        getFriendsList(deleteId, (err, contacts) => {
                             deletedFriendWs.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
                         });
                     }
-                    break;
-
-                case 'block_user':
-                    if (!currentUser) break;
-                    
-                    const { blockedId } = data;
-                    
-                    db.run(`INSERT OR IGNORE INTO blocked_users (user_id, blocked_id) VALUES (?, ?)`,
-                        [currentUser.userId, blockedId]);
-                    
-                    db.run(`DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)`,
-                        [currentUser.userId, blockedId, blockedId, currentUser.userId]);
-                    
-                    getBlockedUsers(currentUser.userId, (blocked) => {
-                        ws.send(JSON.stringify({ type: 'blocked_list', blocked: blocked }));
-                    });
-                    break;
-
-                case 'unblock_user':
-                    if (!currentUser) break;
-                    
-                    const { unblockedId } = data;
-                    
-                    db.run(`DELETE FROM blocked_users WHERE user_id = ? AND blocked_id = ?`,
-                        [currentUser.userId, unblockedId]);
-                    
-                    getBlockedUsers(currentUser.userId, (blocked) => {
-                        ws.send(JSON.stringify({ type: 'blocked_list', blocked: blocked }));
-                    });
-                    break;
-
-                case 'pin_contact':
-                    if (!currentUser) break;
-                    
-                    const { contactId } = data;
-                    
-                    db.run(`INSERT OR IGNORE INTO pinned_contacts (user_id, contact_id) VALUES (?, ?)`,
-                        [currentUser.userId, contactId]);
-                    
-                    getPinnedContacts(currentUser.userId, (pinned) => {
-                        ws.send(JSON.stringify({ type: 'pinned_contacts', pinned: pinned }));
-                    });
-                    break;
-
-                case 'unpin_contact':
-                    if (!currentUser) break;
-                    
-                    const { unpinId } = data;
-                    
-                    db.run(`DELETE FROM pinned_contacts WHERE user_id = ? AND contact_id = ?`,
-                        [currentUser.userId, unpinId]);
-                    
-                    getPinnedContacts(currentUser.userId, (pinned) => {
-                        ws.send(JSON.stringify({ type: 'pinned_contacts', pinned: pinned }));
-                    });
                     break;
 
                 case 'clear_chat':
@@ -1033,15 +620,14 @@ wss.on('connection', (ws) => {
                 case 'update_profile':
                     if (!currentUser) break;
                     
-                    const { name, bio, avatar, theme, accent_color, privacy_last_seen, privacy_messages, privacy_groups, notification_sound, notification_vibrate, notification_preview, invisible_mode } = data;
+                    const { name, bio, avatar, theme, accent_color, privacy_last_seen, privacy_messages, privacy_groups, notification_sound, notification_vibrate, notification_preview } = data;
                     
                     db.run(`UPDATE users SET name = ?, bio = ?, avatar = ?, theme = ?, accent_color = ?, 
                             privacy_last_seen = ?, privacy_messages = ?, privacy_groups = ?,
-                            notification_sound = ?, notification_vibrate = ?, notification_preview = ?,
-                            invisible_mode = ?
+                            notification_sound = ?, notification_vibrate = ?, notification_preview = ?
                             WHERE id = ?`,
                         [name, bio, avatar, theme, accent_color, privacy_last_seen, privacy_messages, privacy_groups,
-                         notification_sound, notification_vibrate, notification_preview, invisible_mode, currentUser.userId]);
+                         notification_sound, notification_vibrate, notification_preview, currentUser.userId]);
                     break;
 
                 case 'get_channel_stats':
@@ -1059,7 +645,6 @@ wss.on('connection', (ws) => {
                 case 'channel_view':
                     if (currentUser) {
                         db.run(`INSERT OR IGNORE INTO channel_views (user_id) VALUES (?)`, [currentUser.userId]);
-                        db.run(`UPDATE channel_messages SET views = views + 1 WHERE id IN (SELECT id FROM channel_messages ORDER BY id DESC LIMIT 10)`);
                     }
                     break;
 
@@ -1068,17 +653,19 @@ wss.on('connection', (ws) => {
                     
                     const { group } = data;
                     
-                    db.serialize(() => {
-                        db.run(`INSERT INTO groups (id, name, description, created_by, welcome_message) VALUES (?, ?, ?, ?, ?)`,
-                            [group.id, group.name, group.description, currentUser.userId, group.welcomeMessage || '']);
-                        
-                        db.run(`INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'creator')`,
-                            [group.id, currentUser.userId]);
-                        
-                        ws.send(JSON.stringify({
-                            type: 'group_created',
-                            group: { ...group, members: [currentUser.userId] }
-                        }));
+                    db.run(`INSERT INTO groups (id, name, description, created_by) VALUES (?, ?, ?, ?)`,
+                        [group.id, group.name, group.description, currentUser.userId]);
+                    
+                    db.run(`INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'creator')`,
+                        [group.id, currentUser.userId]);
+                    
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN && group.members.includes(userId)) {
+                            client.send(JSON.stringify({
+                                type: 'group_created',
+                                group: group
+                            }));
+                        }
                     });
                     break;
 
@@ -1089,40 +676,17 @@ wss.on('connection', (ws) => {
                     
                     members.forEach(memberId => {
                         db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)`,
-                            [groupId, memberId], function(err) {
-                                if (!err) {
-                                    const memberWs = clients.get(memberId);
-                                    if (memberWs) {
-                                        db.get(`SELECT * FROM groups WHERE id = ?`, [groupId], (err, group) => {
-                                            if (group) {
-                                                memberWs.send(JSON.stringify({
-                                                    type: 'group_created',
-                                                    group: group
-                                                }));
-                                            }
-                                        });
-                                    } else {
-                                        db.get(`SELECT name FROM groups WHERE id = ?`, [groupId], (err, group) => {
-                                            if (group) {
-                                                sendPushNotification(
-                                                    memberId,
-                                                    currentUser.username,
-                                                    `Добавил(а) вас в группу "${group.name}"`,
-                                                    { type: 'group_added', groupId: groupId }
-                                                );
-                                            }
-                                        });
-                                    }
-                                }
-                            });
+                            [groupId, memberId]);
                     });
                     
-                    getGroupMembers(groupId, (membersList) => {
-                        ws.send(JSON.stringify({
-                            type: 'group_members_updated',
-                            groupId: groupId,
-                            count: membersList.length
-                        }));
+                    clients.forEach((client, userId) => {
+                        if (client && client.readyState === WebSocket.OPEN && members.includes(userId)) {
+                            client.send(JSON.stringify({
+                                type: 'group_members_added',
+                                groupId: groupId,
+                                members: members
+                            }));
+                        }
                     });
                     break;
 
@@ -1141,22 +705,7 @@ wss.on('connection', (ws) => {
                             groupId: kickGroupId,
                             memberId: memberId
                         }));
-                    } else {
-                        sendPushNotification(
-                            memberId,
-                            currentUser.username,
-                            'Вас исключили из группы',
-                            { type: 'group_kicked', groupId: kickGroupId }
-                        );
                     }
-                    
-                    getGroupMembers(kickGroupId, (membersList) => {
-                        ws.send(JSON.stringify({
-                            type: 'group_members_updated',
-                            groupId: kickGroupId,
-                            count: membersList.length
-                        }));
-                    });
                     break;
 
                 case 'delete_group':
@@ -1173,13 +722,6 @@ wss.on('connection', (ws) => {
                                 type: 'group_deleted',
                                 groupId: deleteGroupId
                             }));
-                        } else {
-                            sendPushNotification(
-                                userId,
-                                'Система',
-                                'Группа была удалена',
-                                { type: 'group_deleted', groupId: deleteGroupId }
-                            );
                         }
                     });
                     break;
@@ -1203,76 +745,27 @@ wss.on('connection', (ws) => {
                     });
                     break;
 
-                case 'create_poll':
-                    if (!currentUser) break;
-                    
-                    const { pollGroupId, question, options, multiple } = data;
-                    
-                    db.run(`INSERT INTO group_polls (group_id, created_by, question, options, multiple) 
-                            VALUES (?, ?, ?, ?, ?)`,
-                        [pollGroupId, currentUser.userId, question, JSON.stringify(options), multiple || false],
-                        function(err) {
-                            if (!err) {
-                                const pollId = this.lastID;
-                                
-                                getGroupMembers(pollGroupId, (members) => {
-                                    members.forEach(memberId => {
-                                        const memberWs = clients.get(memberId);
-                                        const pollData = {
-                                            type: 'new_poll',
-                                            pollId: pollId,
-                                            groupId: pollGroupId,
-                                            question: question,
-                                            options: options,
-                                            multiple: multiple,
-                                            createdBy: currentUser.userId
-                                        };
-                                        
-                                        if (memberWs && memberWs.readyState === WebSocket.OPEN) {
-                                            memberWs.send(JSON.stringify(pollData));
-                                        } else if (memberId !== currentUser.userId) {
-                                            sendPushNotification(
-                                                memberId,
-                                                currentUser.username,
-                                                `Новый опрос в группе: ${question}`,
-                                                { type: 'new_poll', pollId: pollId.toString() }
-                                            );
-                                        }
-                                    });
-                                });
-                            }
-                        });
-                    break;
-
-                case 'vote_poll':
-                    if (!currentUser) break;
-                    
-                    const { pollId, optionIndex } = data;
-                    
-                    db.run(`INSERT OR REPLACE INTO poll_votes (poll_id, user_id, option_index) VALUES (?, ?, ?)`,
-                        [pollId, currentUser.userId, optionIndex]);
-                    break;
-
                 case 'reaction':
                     if (!currentUser) break;
                     
-                    const { chatId: reactionChatId, messageId: reactionMessageId, reaction: reactionEmoji, remove } = data;
+                    const { chatId: reactionChatId, messageId: reactionMessageId, reaction, remove } = data;
                     
                     if (remove) {
                         db.run(`DELETE FROM reactions WHERE user_id = ? AND message_id = ?`,
                             [currentUser.userId, reactionMessageId]);
                     } else {
                         db.run(`INSERT OR REPLACE INTO reactions (user_id, message_id, reaction) VALUES (?, ?, ?)`,
-                            [currentUser.userId, reactionMessageId, reactionEmoji]);
+                            [currentUser.userId, reactionMessageId, reaction]);
                     }
                     
+                    // Рассылаем всем в чате
                     clients.forEach((client, userId) => {
                         if (client && client.readyState === WebSocket.OPEN) {
                             client.send(JSON.stringify({
                                 type: 'reaction',
                                 chatId: reactionChatId,
                                 messageId: reactionMessageId,
-                                reaction: reactionEmoji,
+                                reaction: reaction,
                                 userId: currentUser.userId,
                                 remove: remove
                             }));
@@ -1343,6 +836,8 @@ wss.on('connection', (ws) => {
                     
                     if (forEveryone) {
                         db.run(`DELETE FROM messages WHERE id = ?`, [deleteMessageId]);
+                    } else {
+                        // TODO: удалить только у себя
                     }
                     
                     clients.forEach((client, userId) => {
@@ -1396,114 +891,6 @@ wss.on('connection', (ws) => {
                         }));
                     }
                     break;
-
-                case 'create_story':
-                    if (!currentUser) break;
-                    
-                    const { storyImage, storyText } = data;
-                    
-                    db.run(`INSERT INTO stories (user_id, image_url, text) VALUES (?, ?, ?)`,
-                        [currentUser.userId, storyImage, storyText], function(err) {
-                            if (!err) {
-                                const storyId = this.lastID;
-                                
-                                getFriendsList(currentUser.userId, (friends) => {
-                                    friends.forEach(friend => {
-                                        const friendWs = clients.get(friend.id);
-                                        if (friendWs && friendWs.readyState === WebSocket.OPEN) {
-                                            friendWs.send(JSON.stringify({
-                                                type: 'new_story',
-                                                storyId: storyId,
-                                                userId: currentUser.userId,
-                                                userName: currentUser.username,
-                                                imageUrl: storyImage,
-                                                text: storyText
-                                            }));
-                                        } else {
-                                            sendPushNotification(
-                                                friend.id,
-                                                currentUser.username,
-                                                '📸 Опубликовал(а) новую историю',
-                                                { type: 'new_story', storyId: storyId.toString() }
-                                            );
-                                        }
-                                    });
-                                });
-                            }
-                        });
-                    break;
-
-                case 'view_story':
-                    if (!currentUser) break;
-                    
-                    const { storyId: viewStoryId, reaction: storyReaction } = data;
-                    
-                    db.run(`INSERT OR IGNORE INTO story_views (story_id, user_id, reaction) VALUES (?, ?, ?)`,
-                        [viewStoryId, currentUser.userId, storyReaction]);
-                    break;
-
-                case 'get_stickers':
-                    db.all(`SELECT * FROM stickers`, [], (err, stickers) => {
-                        ws.send(JSON.stringify({ type: 'stickers_list', stickers: stickers || [] }));
-                    });
-                    break;
-
-                case 'search_messages':
-                    if (!currentUser) break;
-                    
-                    const { searchQuery, searchFrom, searchDate } = data;
-                    
-                    let query = `SELECT m.*, u.name as from_name 
-                                 FROM messages m
-                                 JOIN users u ON u.id = m.from_id
-                                 WHERE (m.from_id = ? OR m.to_id = ?)`;
-                    let params = [currentUser.userId, currentUser.userId];
-                    
-                    if (searchQuery) {
-                        query += ` AND m.text LIKE ?`;
-                        params.push(`%${searchQuery}%`);
-                    }
-                    if (searchFrom) {
-                        query += ` AND m.from_id = ?`;
-                        params.push(searchFrom);
-                    }
-                    if (searchDate) {
-                        query += ` AND date(m.timestamp) = date(?)`;
-                        params.push(searchDate);
-                    }
-                    
-                    query += ` ORDER BY m.timestamp DESC LIMIT 100`;
-                    
-                    db.all(query, params, (err, messages) => {
-                        ws.send(JSON.stringify({ type: 'search_results', messages: messages || [] }));
-                    });
-                    break;
-
-                case 'create_bot':
-                    if (!currentUser || currentUser.userId !== ADMIN_ID) break;
-                    
-                    const { botName, botToken, webhookUrl } = data;
-                    
-                    const botId = 'bot_' + Date.now();
-                    
-                    db.run(`INSERT INTO bots (id, name, token, owner_id, webhook_url) VALUES (?, ?, ?, ?, ?)`,
-                        [botId, botName, botToken, currentUser.userId, webhookUrl]);
-                    break;
-
-                case 'bot_message':
-                    const { botId: messageBotId, chatId: messageChatId, botText: messageBotText } = data;
-                    
-                    db.get(`SELECT * FROM bots WHERE id = ?`, [messageBotId], (err, bot) => {
-                        if (bot && bot.webhook_url) {
-                            axios.post(bot.webhook_url, {
-                                message: messageBotText,
-                                from: messageBotId,
-                                to: messageChatId,
-                                timestamp: new Date().toISOString()
-                            }).catch(e => console.log('Webhook error:', e));
-                        }
-                    });
-                    break;
             }
         } catch (e) {
             console.log('❌ Ошибка:', e);
@@ -1513,14 +900,7 @@ wss.on('connection', (ws) => {
     ws.on('close', () => {
         if (currentUser) {
             clients.delete(currentUser.userId);
-            
-            // Обновляем статус (если не невидимка)
-            db.get(`SELECT invisible_mode FROM users WHERE id = ?`, [currentUser.userId], (err, user) => {
-                if (!err && user && !user.invisible_mode) {
-                    db.run(`UPDATE users SET status = 'offline', last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [currentUser.userId]);
-                }
-            });
-            
+            db.run(`UPDATE users SET status = 'offline', last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [currentUser.userId]);
             console.log(`👋 ${currentUser.username} отключился`);
         }
     });

@@ -1256,14 +1256,14 @@ wss.on('connection', (ws) => {
                 case 'reaction':
                     if (!currentUser) break;
                     
-                    const { chatId: reactionChatId, messageId: reactionMessageId, reaction, remove } = data;
+                    const { chatId: reactionChatId, messageId: reactionMessageId, reaction: reactionEmoji, remove } = data;
                     
                     if (remove) {
                         db.run(`DELETE FROM reactions WHERE user_id = ? AND message_id = ?`,
                             [currentUser.userId, reactionMessageId]);
                     } else {
                         db.run(`INSERT OR REPLACE INTO reactions (user_id, message_id, reaction) VALUES (?, ?, ?)`,
-                            [currentUser.userId, reactionMessageId, reaction]);
+                            [currentUser.userId, reactionMessageId, reactionEmoji]);
                     }
                     
                     clients.forEach((client, userId) => {
@@ -1272,7 +1272,7 @@ wss.on('connection', (ws) => {
                                 type: 'reaction',
                                 chatId: reactionChatId,
                                 messageId: reactionMessageId,
-                                reaction: reaction,
+                                reaction: reactionEmoji,
                                 userId: currentUser.userId,
                                 remove: remove
                             }));
@@ -1436,10 +1436,10 @@ wss.on('connection', (ws) => {
                 case 'view_story':
                     if (!currentUser) break;
                     
-                    const { storyId, reaction } = data;
+                    const { storyId: viewStoryId, reaction: storyReaction } = data;
                     
                     db.run(`INSERT OR IGNORE INTO story_views (story_id, user_id, reaction) VALUES (?, ?, ?)`,
-                        [storyId, currentUser.userId, reaction]);
+                        [viewStoryId, currentUser.userId, storyReaction]);
                     break;
 
                 case 'get_stickers':

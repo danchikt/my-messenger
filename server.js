@@ -1491,14 +1491,14 @@ wss.on('connection', (ws) => {
                     break;
 
                 case 'bot_message':
-                    const { botId, chatId, botText } = data;
+                    const { botId: messageBotId, chatId: messageChatId, botText: messageBotText } = data;
                     
-                    db.get(`SELECT * FROM bots WHERE id = ?`, [botId], (err, bot) => {
+                    db.get(`SELECT * FROM bots WHERE id = ?`, [messageBotId], (err, bot) => {
                         if (bot && bot.webhook_url) {
                             axios.post(bot.webhook_url, {
-                                message: botText,
-                                from: botId,
-                                to: chatId,
+                                message: messageBotText,
+                                from: messageBotId,
+                                to: messageChatId,
                                 timestamp: new Date().toISOString()
                             }).catch(e => console.log('Webhook error:', e));
                         }

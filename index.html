@@ -183,7 +183,7 @@
             display: block;
         }
 
-        .auth-screen, .contacts-screen, .chats-screen, .profile-screen, .saved-screen {
+        .auth-screen, .contacts-screen, .chats-screen, .profile-screen, .saved-screen, .stories-screen {
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -396,6 +396,160 @@
             margin-left: 8px;
         }
 
+        /* Стикеры */
+        .sticker-picker {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            display: none;
+            gap: 16px;
+            z-index: 1000;
+            animation: slideUp 0.2s ease;
+            max-width: 90%;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .sticker-picker.active {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .sticker-option {
+            width: 60px;
+            height: 60px;
+            cursor: pointer;
+            transition: transform 0.2s;
+            border-radius: 10px;
+        }
+
+        .sticker-option:hover {
+            transform: scale(1.2);
+            background: var(--bg);
+        }
+
+        .sticker-option img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        /* Истории */
+        .stories-bar {
+            background: var(--surface);
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            white-space: nowrap;
+        }
+
+        .story-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            cursor: pointer;
+        }
+
+        .story-avatar {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 24px;
+            border: 2px solid transparent;
+        }
+
+        .story-avatar.has-story {
+            border-color: var(--primary);
+            padding: 2px;
+        }
+
+        .story-avatar.viewed {
+            opacity: 0.6;
+        }
+
+        .story-name {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .story-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 2000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .story-viewer.active {
+            display: flex;
+        }
+
+        .story-content {
+            width: 100%;
+            max-width: 400px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .story-header {
+            padding: 16px;
+            color: white;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .story-image {
+            flex: 1;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        .story-footer {
+            padding: 16px;
+            color: white;
+            display: flex;
+            gap: 8px;
+        }
+
+        .story-reaction {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            font-size: 20px;
+        }
+
+        .story-reaction:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
         .chat-messages {
             flex: 1;
             overflow-y: auto;
@@ -435,7 +589,6 @@
             padding: 4px;
         }
 
-        /* Панель ответа/редактирования */
         .reply-preview {
             background: var(--surface);
             border-top: 1px solid var(--border);
@@ -625,17 +778,6 @@
             animation: slideUp 0.2s ease;
         }
 
-        @keyframes slideUp {
-            from {
-                transform: translate(-50%, 100%);
-                opacity: 0;
-            }
-            to {
-                transform: translate(-50%, 0);
-                opacity: 1;
-            }
-        }
-
         .reaction-picker.active {
             display: flex;
         }
@@ -696,6 +838,20 @@
             justify-content: center;
         }
 
+        .sticker-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--surface);
+            color: var(--primary);
+            border: 1px solid var(--border);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .attach-btn {
             width: 48px;
             height: 48px;
@@ -708,6 +864,25 @@
             display: flex;
             align-items: center;
             justify-content: center;
+        }
+
+        .self-destruct-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--surface);
+            color: var(--warning);
+            border: 1px solid var(--border);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .self-destruct-btn.active {
+            background: var(--warning);
+            color: white;
         }
 
         .chat-header {
@@ -1313,6 +1488,28 @@
             font-style: italic;
         }
 
+        .self-destruct-timer {
+            font-size: 10px;
+            color: var(--warning);
+            margin-left: 4px;
+        }
+
+        .story-add {
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            border: 2px solid var(--surface);
+        }
+
         /* Адаптация для телефона */
         @media (max-width: 500px) {
             .reply-preview {
@@ -1395,6 +1592,7 @@
                     <button id="addFriendBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">➕</button>
                     <button id="createGroupBtn" style="background: none; border: none; font-size: 20px; cursor: pointer;">👥</button>
                 </div>
+                <div id="storiesBar" class="stories-bar"></div>
                 <div id="contactsList" class="contacts-list"></div>
             </div>
         </div>
@@ -1445,7 +1643,9 @@
                 </div>
 
                 <div class="chat-input-area">
+                    <button class="sticker-btn" id="stickerBtn">😊</button>
                     <button class="attach-btn" id="attachFileBtn">📎</button>
+                    <button class="self-destruct-btn" id="selfDestructBtn">⏱️</button>
                     <input type="text" id="chatInput" class="chat-input" placeholder="Сообщение..." disabled>
                     <button id="sendMessageBtn" class="chat-send" disabled>➤</button>
                 </div>
@@ -1512,12 +1712,28 @@
                         <div class="settings-item-right">⚙️</div>
                     </div>
 
+                    <div class="settings-item" onclick="showStickers()">
+                        <div class="settings-item-left">
+                            <span>😊</span>
+                            <span>Стикеры</span>
+                        </div>
+                        <div class="settings-item-right">⚙️</div>
+                    </div>
+
                     <div class="settings-item" onclick="openSavedScreen()">
                         <div class="settings-item-left">
                             <span>💾</span>
                             <span>Избранное</span>
                         </div>
                         <div class="settings-item-right" id="savedCountSmall">0</div>
+                    </div>
+
+                    <div class="settings-item" onclick="showSearch()">
+                        <div class="settings-item-left">
+                            <span>🔍</span>
+                            <span>Поиск сообщений</span>
+                        </div>
+                        <div class="settings-item-right">⚙️</div>
                     </div>
 
                     <div class="settings-item" onclick="showArchive()">
@@ -1548,6 +1764,28 @@
         <span class="reaction-option" onclick="addReactionToSelected('🎉')">🎉</span>
     </div>
 
+    <!-- Панель выбора стикеров -->
+    <div id="stickerPicker" class="sticker-picker">
+        <!-- Стикеры будут загружаться сюда -->
+    </div>
+
+    <!-- Просмотр истории -->
+    <div id="storyViewer" class="story-viewer">
+        <div class="story-content">
+            <div class="story-header">
+                <div class="story-avatar" id="storyAvatar"></div>
+                <div id="storyName"></div>
+            </div>
+            <div class="story-image" id="storyImage"></div>
+            <div class="story-footer">
+                <div class="story-reaction" onclick="reactToStory('👍')">👍</div>
+                <div class="story-reaction" onclick="reactToStory('❤️')">❤️</div>
+                <div class="story-reaction" onclick="reactToStory('😮')">😮</div>
+                <div class="story-reaction" onclick="reactToStory('😢')">😢</div>
+            </div>
+        </div>
+    </div>
+
     <!-- Модальные окна -->
     <div id="addFriendModal" class="modal">
         <div class="modal-content">
@@ -1565,6 +1803,7 @@
             <div class="modal-title">Создать группу</div>
             <input type="text" id="groupName" class="modal-input" placeholder="Название группы">
             <input type="text" id="groupDescription" class="modal-input" placeholder="Описание (необязательно)">
+            <input type="text" id="groupWelcome" class="modal-input" placeholder="Приветственное сообщение">
             <div class="modal-buttons">
                 <button id="createGroupCancel" class="modal-button modal-button-secondary">Отмена</button>
                 <button id="createGroupConfirm" class="modal-button modal-button-primary">Создать</button>
@@ -1594,15 +1833,61 @@
         </div>
     </div>
 
+    <div id="createPollModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Создать опрос</div>
+            <input type="text" id="pollQuestion" class="modal-input" placeholder="Вопрос">
+            <div id="pollOptions">
+                <input type="text" class="modal-input poll-option" placeholder="Вариант 1">
+                <input type="text" class="modal-input poll-option" placeholder="Вариант 2">
+            </div>
+            <button class="auth-button" onclick="addPollOption()" style="margin-bottom: 16px;">➕ Добавить вариант</button>
+            <label>
+                <input type="checkbox" id="pollMultiple"> Разрешить несколько вариантов
+            </label>
+            <div class="modal-buttons">
+                <button class="modal-button modal-button-secondary" onclick="closePollModal()">Отмена</button>
+                <button class="modal-button modal-button-primary" onclick="createPoll()">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="searchModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Поиск сообщений</div>
+            <input type="text" id="searchQuery" class="modal-input" placeholder="Текст сообщения">
+            <select id="searchFrom" class="modal-input">
+                <option value="">Все отправители</option>
+            </select>
+            <input type="date" id="searchDate" class="modal-input">
+            <div class="modal-buttons">
+                <button class="modal-button modal-button-secondary" onclick="closeSearchModal()">Закрыть</button>
+                <button class="modal-button modal-button-primary" onclick="searchMessages()">Найти</button>
+            </div>
+        </div>
+    </div>
+
     <div id="editProfileModal" class="modal">
         <div class="modal-content">
             <div class="modal-title">Редактировать профиль</div>
             <input type="text" id="editName" class="modal-input" placeholder="Имя">
-            <input type="text" id="editBio" class="modal-input" placeholder="О себе">
+            <textarea id="editBio" class="modal-input" placeholder="О себе" rows="3"></textarea>
             <input type="file" id="editAvatarFile" accept="image/*" class="modal-input" style="padding: 8px;">
             <div class="modal-buttons">
                 <button id="editProfileCancel" class="modal-button modal-button-secondary">Отмена</button>
                 <button id="editProfileConfirm" class="modal-button modal-button-primary">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="storyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Новая история</div>
+            <input type="file" id="storyImageInput" accept="image/*" class="modal-input">
+            <textarea id="storyText" class="modal-input" placeholder="Текст истории (необязательно)" rows="3"></textarea>
+            <div class="modal-buttons">
+                <button class="modal-button modal-button-secondary" onclick="closeStoryModal()">Отмена</button>
+                <button class="modal-button modal-button-primary" onclick="createStory()">Опубликовать</button>
             </div>
         </div>
     </div>
@@ -1661,6 +1946,11 @@
                     <option value="everyone">Все</option>
                     <option value="contacts">Только контакты</option>
                 </select>
+            </div>
+
+            <div class="settings-item">
+                <span>Режим невидимки</span>
+                <input type="checkbox" id="invisibleMode">
             </div>
 
             <div class="modal-buttons">
@@ -1758,7 +2048,33 @@
         </div>
     </div>
 
+    <div id="selfDestructModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Самоуничтожение</div>
+            <p style="margin-bottom: 16px;">Сообщение исчезнет через:</p>
+            <div class="settings-item" onclick="setSelfDestruct(5)">
+                <span>5 секунд</span>
+            </div>
+            <div class="settings-item" onclick="setSelfDestruct(30)">
+                <span>30 секунд</span>
+            </div>
+            <div class="settings-item" onclick="setSelfDestruct(60)">
+                <span>1 минута</span>
+            </div>
+            <div class="settings-item" onclick="setSelfDestruct(300)">
+                <span>5 минут</span>
+            </div>
+            <div class="settings-item" onclick="setSelfDestruct(0)">
+                <span>Отключить</span>
+            </div>
+        </div>
+    </div>
+
     <div id="notificationContainer" class="notification-container"></div>
+
+    <!-- Firebase SDK (для PUSH-уведомлений) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-messaging-compat.js"></script>
 
     <script>
         // ========== СОСТОЯНИЕ ==========
@@ -1789,7 +2105,8 @@
         let privacySettings = JSON.parse(localStorage.getItem('privacySettings')) || {
             lastSeen: 'everyone',
             messages: 'everyone',
-            groups: 'everyone'
+            groups: 'everyone',
+            invisibleMode: false
         };
         let notificationSettings = JSON.parse(localStorage.getItem('notificationSettings')) || {
             sound: true,
@@ -1798,6 +2115,12 @@
         };
         let typingTimeout = null;
         let typingUsers = {};
+        let stickers = [];
+        let stories = [];
+        let currentStoryIndex = 0;
+        let selfDestructTime = 0;
+        let firebaseMessaging = null;
+        let pollOptions = 2;
 
         // ID канала (фиксированный)
         const CHANNEL_ID = 'channel_clock';
@@ -1840,11 +2163,14 @@
         const searchContacts = document.getElementById('searchContacts');
         const addFriendBtn = document.getElementById('addFriendBtn');
         const createGroupBtn = document.getElementById('createGroupBtn');
+        const storiesBar = document.getElementById('storiesBar');
         
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendMessageBtn = document.getElementById('sendMessageBtn');
         const attachFileBtn = document.getElementById('attachFileBtn');
+        const stickerBtn = document.getElementById('stickerBtn');
+        const selfDestructBtn = document.getElementById('selfDestructBtn');
         const chatName = document.getElementById('chatName');
         const chatStatus = document.getElementById('chatStatus');
         const chatMenuBtn = document.getElementById('chatMenuBtn');
@@ -1874,6 +2200,7 @@
         const createGroupModal = document.getElementById('createGroupModal');
         const groupName = document.getElementById('groupName');
         const groupDescription = document.getElementById('groupDescription');
+        const groupWelcome = document.getElementById('groupWelcome');
         const createGroupConfirm = document.getElementById('createGroupConfirm');
         const createGroupCancel = document.getElementById('createGroupCancel');
         
@@ -1887,6 +2214,15 @@
         const groupMembersList = document.getElementById('groupMembersList');
         const groupMembersClose = document.getElementById('groupMembersClose');
         
+        const createPollModal = document.getElementById('createPollModal');
+        const pollQuestion = document.getElementById('pollQuestion');
+        const pollMultiple = document.getElementById('pollMultiple');
+        
+        const searchModal = document.getElementById('searchModal');
+        const searchQuery = document.getElementById('searchQuery');
+        const searchFrom = document.getElementById('searchFrom');
+        const searchDate = document.getElementById('searchDate');
+        
         const editProfileModal = document.getElementById('editProfileModal');
         const editName = document.getElementById('editName');
         const editBio = document.getElementById('editBio');
@@ -1894,8 +2230,13 @@
         const editProfileConfirm = document.getElementById('editProfileConfirm');
         const editProfileCancel = document.getElementById('editProfileCancel');
         
+        const storyModal = document.getElementById('storyModal');
+        const storyImageInput = document.getElementById('storyImageInput');
+        const storyText = document.getElementById('storyText');
+        
         const themeModal = document.getElementById('themeModal');
         const privacyModal = document.getElementById('privacyModal');
+        const invisibleMode = document.getElementById('invisibleMode');
         const notificationsModal = document.getElementById('notificationsModal');
         const messageOptionsModal = document.getElementById('messageOptionsModal');
         const forwardModal = document.getElementById('forwardModal');
@@ -1908,6 +2249,7 @@
         const saveMessageOption = document.getElementById('saveMessageOption');
         const searchForwardContacts = document.getElementById('searchForwardContacts');
         const forwardContactsList = document.getElementById('forwardContactsList');
+        const selfDestructModal = document.getElementById('selfDestructModal');
         
         const confirmModal = document.getElementById('confirmModal');
         const confirmTitle = document.getElementById('confirmTitle');
@@ -1918,7 +2260,69 @@
         const notificationBell = document.getElementById('notificationBell');
         const notificationCount = document.getElementById('notificationCount');
         const reactionPicker = document.getElementById('reactionPicker');
+        const stickerPicker = document.getElementById('stickerPicker');
+        const storyViewer = document.getElementById('storyViewer');
+        const storyAvatar = document.getElementById('storyAvatar');
+        const storyName = document.getElementById('storyName');
+        const storyImage = document.getElementById('storyImage');
+        
         let notificationPopup = null;
+
+        // ========== ИНИЦИАЛИЗАЦИЯ FIREBASE ==========
+        function initFirebase() {
+            const firebaseConfig = {
+                apiKey: "YOUR_API_KEY",
+                authDomain: "YOUR_AUTH_DOMAIN",
+                projectId: "YOUR_PROJECT_ID",
+                storageBucket: "YOUR_STORAGE_BUCKET",
+                messagingSenderId: "YOUR_SENDER_ID",
+                appId: "YOUR_APP_ID"
+            };
+
+            try {
+                firebase.initializeApp(firebaseConfig);
+                firebaseMessaging = firebase.messaging();
+                
+                // Запрашиваем разрешение
+                requestNotificationPermission();
+                
+                // Обработка сообщений когда приложение открыто
+                firebaseMessaging.onMessage((payload) => {
+                    console.log('📨 Получено push:', payload);
+                    
+                    if (notificationSettings.preview) {
+                        showNotification(
+                            payload.notification.title,
+                            'info',
+                            { body: payload.notification.body }
+                        );
+                    }
+                });
+            } catch (e) {
+                console.log('⚠️ Firebase не настроен');
+            }
+        }
+
+        async function requestNotificationPermission() {
+            try {
+                const permission = await Notification.requestPermission();
+                if (permission === 'granted') {
+                    console.log('✅ Разрешение получено');
+                    const fcmToken = await firebaseMessaging.getToken();
+                    console.log('FCM Token:', fcmToken);
+                    
+                    if (socket && currentUser) {
+                        socket.send(JSON.stringify({
+                            type: 'register_fcm',
+                            token: fcmToken,
+                            device: 'android'
+                        }));
+                    }
+                }
+            } catch (e) {
+                console.error('❌ Ошибка получения разрешения:', e);
+            }
+        }
 
         // ========== ТЕМЫ ==========
         function applyTheme() {
@@ -1978,6 +2382,7 @@
             document.getElementById('privacyLastSeen').value = privacySettings.lastSeen;
             document.getElementById('privacyMessages').value = privacySettings.messages;
             document.getElementById('privacyGroups').value = privacySettings.groups;
+            invisibleMode.checked = privacySettings.invisibleMode || false;
             privacyModal.classList.add('active');
         }
 
@@ -1989,9 +2394,18 @@
             privacySettings = {
                 lastSeen: document.getElementById('privacyLastSeen').value,
                 messages: document.getElementById('privacyMessages').value,
-                groups: document.getElementById('privacyGroups').value
+                groups: document.getElementById('privacyGroups').value,
+                invisibleMode: invisibleMode.checked
             };
             localStorage.setItem('privacySettings', JSON.stringify(privacySettings));
+            
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'update_profile',
+                    ...privacySettings
+                }));
+            }
+            
             closePrivacyModal();
             showNotification('Настройки сохранены', 'success');
         }
@@ -2014,8 +2428,269 @@
                 preview: document.getElementById('notifPreview').checked
             };
             localStorage.setItem('notificationSettings', JSON.stringify(notificationSettings));
+            
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'update_profile',
+                    ...notificationSettings
+                }));
+            }
+            
             closeNotificationsModal();
             showNotification('Настройки сохранены', 'success');
+        }
+
+        // ========== СТИКЕРЫ ==========
+        function showStickers() {
+            if (socket) {
+                socket.send(JSON.stringify({ type: 'get_stickers' }));
+            }
+        }
+
+        function loadStickers(stickersList) {
+            stickers = stickersList;
+            stickerPicker.innerHTML = '';
+            
+            stickers.forEach(sticker => {
+                const img = document.createElement('img');
+                img.src = sticker.image_url;
+                img.className = 'sticker-option';
+                img.onclick = () => sendSticker(sticker.id);
+                stickerPicker.appendChild(img);
+            });
+        }
+
+        function toggleStickerPicker() {
+            stickerPicker.classList.toggle('active');
+        }
+
+        function sendSticker(stickerId) {
+            if (currentChat && socket) {
+                socket.send(JSON.stringify({
+                    type: 'message',
+                    to: currentChat.id,
+                    text: `[sticker:${stickerId}]`
+                }));
+                
+                addMessage(currentUser.id, currentChat.id, '📦 Стикер', new Date().toISOString());
+                stickerPicker.classList.remove('active');
+            }
+        }
+
+        // ========== ИСТОРИИ ==========
+        function showStoryModal() {
+            storyModal.classList.add('active');
+        }
+
+        function closeStoryModal() {
+            storyModal.classList.remove('active');
+            storyImageInput.value = '';
+            storyText.value = '';
+        }
+
+        function createStory() {
+            const file = storyImageInput.files[0];
+            if (!file) {
+                showNotification('Выберите изображение', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (socket) {
+                    socket.send(JSON.stringify({
+                        type: 'create_story',
+                        storyImage: reader.result,
+                        storyText: storyText.value
+                    }));
+                }
+                closeStoryModal();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function updateStoriesBar() {
+            if (!currentUser) return;
+            
+            storiesBar.innerHTML = '';
+            
+            // Кнопка добавления истории
+            const addStoryDiv = document.createElement('div');
+            addStoryDiv.className = 'story-item';
+            addStoryDiv.onclick = showStoryModal;
+            addStoryDiv.innerHTML = `
+                <div class="story-avatar" style="position: relative;">
+                    +
+                    <span class="story-add">➕</span>
+                </div>
+                <div class="story-name">Моя история</div>
+            `;
+            storiesBar.appendChild(addStoryDiv);
+            
+            // Истории контактов
+            stories.forEach(story => {
+                const storyDiv = document.createElement('div');
+                storyDiv.className = 'story-item';
+                storyDiv.onclick = () => openStory(story.id);
+                storyDiv.innerHTML = `
+                    <div class="story-avatar ${story.viewed ? 'viewed' : 'has-story'}">
+                        ${getInitials(story.user_name)}
+                    </div>
+                    <div class="story-name">${story.user_name}</div>
+                `;
+                storiesBar.appendChild(storyDiv);
+            });
+        }
+
+        function openStory(storyId) {
+            const story = stories.find(s => s.id === storyId);
+            if (!story) return;
+            
+            storyAvatar.textContent = getInitials(story.user_name);
+            storyName.textContent = story.user_name;
+            storyImage.style.backgroundImage = `url(${story.image_url})`;
+            storyViewer.classList.add('active');
+            
+            currentStoryIndex = stories.findIndex(s => s.id === storyId);
+        }
+
+        function closeStory() {
+            storyViewer.classList.remove('active');
+        }
+
+        function reactToStory(reaction) {
+            if (socket && stories[currentStoryIndex]) {
+                socket.send(JSON.stringify({
+                    type: 'view_story',
+                    storyId: stories[currentStoryIndex].id,
+                    reaction: reaction
+                }));
+            }
+            nextStory();
+        }
+
+        function nextStory() {
+            if (currentStoryIndex < stories.length - 1) {
+                currentStoryIndex++;
+                const story = stories[currentStoryIndex];
+                storyAvatar.textContent = getInitials(story.user_name);
+                storyName.textContent = story.user_name;
+                storyImage.style.backgroundImage = `url(${story.image_url})`;
+            } else {
+                closeStory();
+            }
+        }
+
+        // ========== САМОУНИЧТОЖЕНИЕ ==========
+        function toggleSelfDestruct() {
+            selfDestructModal.classList.toggle('active');
+        }
+
+        function setSelfDestruct(seconds) {
+            selfDestructTime = seconds;
+            if (seconds > 0) {
+                selfDestructBtn.classList.add('active');
+                showNotification(`Сообщения будут исчезать через ${seconds} секунд`, 'info');
+            } else {
+                selfDestructBtn.classList.remove('active');
+            }
+            selfDestructModal.classList.remove('active');
+        }
+
+        // ========== ОПРОСЫ ==========
+        function showPollModal() {
+            if (!currentChat || !currentChat.id.startsWith('group_')) {
+                showNotification('Опросы можно создавать только в группах', 'error');
+                return;
+            }
+            
+            pollOptions = 2;
+            document.getElementById('pollOptions').innerHTML = `
+                <input type="text" class="modal-input poll-option" placeholder="Вариант 1">
+                <input type="text" class="modal-input poll-option" placeholder="Вариант 2">
+            `;
+            createPollModal.classList.add('active');
+        }
+
+        function addPollOption() {
+            pollOptions++;
+            const optionsDiv = document.getElementById('pollOptions');
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.className = 'modal-input poll-option';
+            input.placeholder = `Вариант ${pollOptions}`;
+            optionsDiv.appendChild(input);
+        }
+
+        function closePollModal() {
+            createPollModal.classList.remove('active');
+        }
+
+        function createPoll() {
+            const question = pollQuestion.value.trim();
+            if (!question) {
+                showNotification('Введите вопрос', 'error');
+                return;
+            }
+            
+            const options = [];
+            document.querySelectorAll('.poll-option').forEach(input => {
+                if (input.value.trim()) {
+                    options.push(input.value.trim());
+                }
+            });
+            
+            if (options.length < 2) {
+                showNotification('Добавьте минимум 2 варианта', 'error');
+                return;
+            }
+            
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'create_poll',
+                    pollGroupId: currentChat.id,
+                    question: question,
+                    options: options,
+                    multiple: pollMultiple.checked
+                }));
+            }
+            
+            closePollModal();
+            pollQuestion.value = '';
+            showNotification('Опрос создан', 'success');
+        }
+
+        // ========== ПОИСК ==========
+        function showSearch() {
+            // Заполняем список отправителей
+            const fromSelect = document.getElementById('searchFrom');
+            fromSelect.innerHTML = '<option value="">Все отправители</option>';
+            
+            contacts.forEach(contact => {
+                const option = document.createElement('option');
+                option.value = contact.id;
+                option.textContent = contact.name || contact.username;
+                fromSelect.appendChild(option);
+            });
+            
+            searchModal.classList.add('active');
+        }
+
+        function closeSearchModal() {
+            searchModal.classList.remove('active');
+        }
+
+        function searchMessages() {
+            if (!socket) return;
+            
+            socket.send(JSON.stringify({
+                type: 'search_messages',
+                searchQuery: searchQuery.value,
+                searchFrom: searchFrom.value,
+                searchDate: searchDate.value
+            }));
+            
+            closeSearchModal();
         }
 
         // ========== ИЗБРАННОЕ ==========
@@ -2030,6 +2705,13 @@
                 updateSavedCount();
                 closeMessageOptionsModal();
                 showNotification('Сохранено в избранное', 'success');
+                
+                if (socket) {
+                    socket.send(JSON.stringify({
+                        type: 'save_message',
+                        messageId: selectedMessage.id
+                    }));
+                }
             }
         }
 
@@ -2091,6 +2773,13 @@
                 localStorage.setItem('pinnedContacts', JSON.stringify(pinnedContacts));
                 updateContacts();
                 showNotification('Контакт закреплён', 'success');
+                
+                if (socket) {
+                    socket.send(JSON.stringify({
+                        type: 'pin_contact',
+                        contactId: contactId
+                    }));
+                }
             }
         }
 
@@ -2098,6 +2787,13 @@
             pinnedContacts = pinnedContacts.filter(id => id !== contactId);
             localStorage.setItem('pinnedContacts', JSON.stringify(pinnedContacts));
             updateContacts();
+            
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'unpin_contact',
+                    unpinId: contactId
+                }));
+            }
         }
 
         function pinMessage() {
@@ -2422,13 +3118,15 @@
         }
 
         // ========== УТИЛИТЫ ==========
-        function showNotification(message, type = 'info') {
+        function showNotification(message, type = 'info', options = {}) {
             const container = document.getElementById('notificationContainer');
             const notification = document.createElement('div');
             notification.className = `notification ${type}`;
             notification.innerHTML = `
                 <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>${message}</span>
+                    <div>
+                        ${options.body ? `<strong>${message}</strong><br>${options.body}` : message}
+                    </div>
                     <span onclick="this.parentElement.parentElement.remove()" style="cursor: pointer;">✕</span>
                 </div>
             `;
@@ -2651,6 +3349,13 @@
                 localStorage.setItem('blockedUsers', JSON.stringify(blockedUsers));
                 showNotification('Пользователь заблокирован', 'warning');
                 updateContacts();
+                
+                if (socket) {
+                    socket.send(JSON.stringify({
+                        type: 'block_user',
+                        blockedId: contactId
+                    }));
+                }
             }
         }
 
@@ -2659,6 +3364,13 @@
             localStorage.setItem('blockedUsers', JSON.stringify(blockedUsers));
             showNotification('Пользователь разблокирован', 'success');
             updateContacts();
+            
+            if (socket) {
+                socket.send(JSON.stringify({
+                    type: 'unblock_user',
+                    unblockedId: contactId
+                }));
+            }
         }
 
         function deleteContact(contactId) {
@@ -2878,6 +3590,7 @@
                 const group = groups.find(g => g.id === currentChat.id);
                 if (group) {
                     menuHtml += `<div class="chat-menu-item" onclick="showGroupMembers()"><span>👥</span> Участники (${group.members?.length || 1})</div>`;
+                    menuHtml += `<div class="chat-menu-item" onclick="showPollModal()"><span>📊</span> Создать опрос</div>`;
                     if (currentUser.id === group.createdBy) {
                         menuHtml += `<div class="chat-menu-item" onclick="addToGroup()"><span>➕</span> Добавить участников</div>`;
                         menuHtml += `<div class="chat-menu-item danger" onclick="deleteGroup()"><span>🗑️</span> Удалить группу</div>`;
@@ -3072,12 +3785,21 @@
                     }
                 }
                 
+                let timerHtml = '';
+                if (msg.selfDestruct && msg.selfDestructTime) {
+                    const timeLeft = Math.max(0, msg.selfDestructTime - (Date.now() - new Date(msg.timestamp).getTime()) / 1000);
+                    if (timeLeft > 0) {
+                        timerHtml = `<span class="self-destruct-timer">⏱️ ${Math.round(timeLeft)}с</span>`;
+                    }
+                }
+                
                 msgDiv.innerHTML = `
                     ${replyHtml}
                     ${senderHtml}
                     <div>${content}</div>
                     <div class="message-time">
                         ${formatTime(msg.timestamp)}
+                        ${timerHtml}
                         ${msg.edited ? ' <span class="message-status">отредактировано</span>' : ''}
                         ${msg.from === currentUser.id ? ' ✓✓' : ''}
                     </div>
@@ -3089,7 +3811,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null, replyTo = null) {
+        function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null, replyTo = null, selfDestruct = false, selfDestructTime = 0) {
             if (blockedUsers.includes(from) && from !== currentUser.id) return;
             if (!messages[to]) messages[to] = [];
             
@@ -3100,7 +3822,9 @@
                 timestamp: timestamp || new Date().toISOString(), 
                 reactions: { users: {} },
                 read: false,
-                replyTo: replyTo
+                replyTo: replyTo,
+                selfDestruct: selfDestruct,
+                selfDestructTime: selfDestructTime
             };
             
             if (fileData) { 
@@ -3114,6 +3838,16 @@
             
             if (currentChat && (currentChat.id === to)) {
                 renderMessages();
+            }
+            
+            if (selfDestruct) {
+                setTimeout(() => {
+                    messages[to] = messages[to].filter(m => m.id !== message.id);
+                    saveMessages();
+                    if (currentChat && currentChat.id === to) {
+                        renderMessages();
+                    }
+                }, selfDestructTime * 1000);
             }
             
             if (from === CHANNEL_ID || from === 'channel') {
@@ -3233,16 +3967,35 @@
                         console.log('✅ Авторизация успешна');
                         currentUser = { ...currentUser, ...data.user };
                         contacts = data.contacts || [];
+                        blockedUsers = data.blocked || [];
+                        pinnedContacts = data.pinnedContacts || [];
+                        groups = data.groups || [];
+                        
                         saveContacts();
                         saveCurrentUser();
                         updateContacts();
                         showScreen('contacts');
+                        
+                        // Инициализируем Firebase после авторизации
+                        initFirebase();
                         break;
                         
                     case 'friends_list':
                         console.log('📋 Обновление списка друзей:', data.friends);
                         contacts = data.friends || [];
                         saveContacts();
+                        updateContacts();
+                        break;
+                        
+                    case 'blocked_list':
+                        blockedUsers = data.blocked || [];
+                        localStorage.setItem('blockedUsers', JSON.stringify(blockedUsers));
+                        updateContacts();
+                        break;
+                        
+                    case 'pinned_contacts':
+                        pinnedContacts = data.pinned || [];
+                        localStorage.setItem('pinnedContacts', JSON.stringify(pinnedContacts));
                         updateContacts();
                         break;
                         
@@ -3264,8 +4017,7 @@
                         
                     case 'message':
                         console.log('💬 Новое сообщение от:', data.from);
-                        // Добавляем сообщение с информацией об ответе
-                        addMessage(data.from, data.from, data.text, data.timestamp, null, null, null, data.replyTo);
+                        addMessage(data.from, data.from, data.text, data.timestamp, null, null, null, data.replyTo, data.selfDestruct, data.selfDestructTime);
                         break;
                         
                     case 'file_message':
@@ -3317,38 +4069,45 @@
                             groups.push(data.group);
                             saveGroups();
                             
-                            // Если текущий пользователь является участником группы, показываем её
-                            if (data.group.members.includes(currentUser?.id)) {
+                            if (data.group.members?.includes(currentUser?.id)) {
                                 updateContacts();
                                 showNotification(`Группа "${data.group.name}" создана`, 'success');
                             }
                         }
                         break;
                         
-                    case 'group_members_added':
-                        if (data.groupId && data.members) {
+                    case 'group_members_updated':
+                        if (data.groupId) {
                             const group = groups.find(g => g.id === data.groupId);
                             if (group) {
-                                if (!group.members) group.members = [];
-                                // Добавляем новых участников
-                                data.members.forEach(memberId => {
-                                    if (!group.members.includes(memberId)) {
-                                        group.members.push(memberId);
-                                    }
-                                });
-                                saveGroups();
-                                
-                                // Если текущий пользователь был добавлен, показываем группу
-                                if (data.members.includes(currentUser?.id) && !contacts.some(c => c.id === group.id)) {
-                                    updateContacts();
-                                    showNotification(`Вас добавили в группу "${group.name}"`, 'info');
-                                }
-                                
-                                if (currentChat && currentChat.id === data.groupId) {
-                                    chatStatus.textContent = `${group.members.length} участников`;
-                                }
+                                chatStatus.textContent = `${data.count} участников`;
                             }
                         }
+                        break;
+                        
+                    case 'new_poll':
+                        showNotification(`Новый опрос: ${data.question}`, 'info');
+                        break;
+                        
+                    case 'search_results':
+                        if (data.messages && data.messages.length > 0) {
+                            let results = 'Результаты поиска:\n';
+                            data.messages.forEach(msg => {
+                                results += `\n${msg.from_name}: ${msg.text}`;
+                            });
+                            showNotification(results, 'info');
+                        } else {
+                            showNotification('Ничего не найдено', 'info');
+                        }
+                        break;
+                        
+                    case 'stickers_list':
+                        loadStickers(data.stickers);
+                        break;
+                        
+                    case 'new_story':
+                        stories.push(data);
+                        updateStoriesBar();
                         break;
                         
                     case 'member_kicked':
@@ -3432,6 +4191,18 @@
                     case 'typing':
                         if (data.chatId === currentChat?.id) {
                             showTyping(data.userId);
+                        }
+                        break;
+                        
+                    case 'message_read':
+                        if (data.chatId && messages[data.chatId]) {
+                            const msg = messages[data.chatId].find(m => m.id === data.messageId);
+                            if (msg) {
+                                msg.read = true;
+                                if (currentChat && currentChat.id === data.chatId) {
+                                    renderMessages();
+                                }
+                            }
                         }
                         break;
                         
@@ -3669,6 +4440,7 @@
             createGroupModal.classList.remove('active');
             groupName.value = '';
             groupDescription.value = '';
+            groupWelcome.value = '';
         };
         
         createGroupConfirm.onclick = () => {
@@ -3684,6 +4456,7 @@
                     id: groupId,
                     name: name,
                     description: groupDescription.value.trim(),
+                    welcomeMessage: groupWelcome.value.trim(),
                     createdBy: currentUser.id,
                     members: [currentUser.id],
                     createdAt: new Date().toISOString()
@@ -3706,6 +4479,7 @@
                 createGroupModal.classList.remove('active');
                 groupName.value = '';
                 groupDescription.value = '';
+                groupWelcome.value = '';
                 
                 showNotification('Группа создана', 'success');
             }
@@ -3765,7 +4539,8 @@
                 socket.send(JSON.stringify({ 
                     type: 'update_profile', 
                     name: editName.value, 
-                    bio: editBio.value 
+                    bio: editBio.value,
+                    avatar: currentUser.avatar
                 }));
                 currentUser.name = editName.value;
                 currentUser.bio = editBio.value;
@@ -3775,6 +4550,9 @@
             editProfileModal.classList.remove('active');
             showNotification('Профиль обновлен', 'success');
         };
+        
+        stickerBtn.onclick = toggleStickerPicker;
+        selfDestructBtn.onclick = toggleSelfDestruct;
         
         sendMessageBtn.onclick = () => {
             if (!socket || !currentChat || !chatInput.value) return;
@@ -3790,7 +4568,6 @@
                     text: text
                 }));
                 
-                // Не обновляем локально сразу - ждём подтверждения от сервера
                 cancelEdit();
             } else if (currentChat.id === CHANNEL_ID) {
                 if (currentUser.id === ADMIN_ID) {
@@ -3803,28 +4580,27 @@
                     return;
                 }
             } else {
-                // Отправляем обычное сообщение с возможным ответом
+                // Отправляем обычное сообщение с возможным ответом и самоуничтожением
                 socket.send(JSON.stringify({ 
                     type: 'message', 
                     to: currentChat.id, 
                     text: text,
-                    replyTo: replyingTo?.id || null
+                    replyTo: replyingTo?.id || null,
+                    selfDestruct: selfDestructTime > 0,
+                    selfDestructTime: selfDestructTime
                 }));
                 
                 // Добавляем сообщение локально для мгновенного отображения
-                const message = {
-                    id: 'msg_' + Date.now() + Math.random(),
-                    from: currentUser.id,
-                    text: text,
-                    timestamp: new Date().toISOString(),
-                    reactions: { users: {} },
-                    replyTo: replyingTo?.id || null
-                };
-                
-                if (!messages[currentChat.id]) messages[currentChat.id] = [];
-                messages[currentChat.id].push(message);
-                saveMessages();
-                renderMessages();
+                addMessage(
+                    currentUser.id, 
+                    currentChat.id, 
+                    text, 
+                    new Date().toISOString(), 
+                    null, null, null, 
+                    replyingTo?.id || null,
+                    selfDestructTime > 0,
+                    selfDestructTime
+                );
                 
                 if (replyingTo) cancelReply();
             }

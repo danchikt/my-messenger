@@ -248,10 +248,11 @@
             margin-top: 10px;
         }
 
+        /* Новый поиск с кнопками */
         .search-bar {
             background: var(--surface);
             border-radius: 20px;
-            padding: 8px 16px;
+            padding: 4px 8px 4px 16px;
             margin-bottom: 16px;
             display: flex;
             align-items: center;
@@ -260,17 +261,57 @@
             box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
 
-        .search-bar input {
+        .search-input {
             flex: 1;
             border: none;
             background: none;
-            padding: 8px 0;
+            padding: 10px 0;
             font-size: 16px;
             color: var(--text);
+            min-width: 0;
         }
 
-        .search-bar input:focus {
+        .search-input:focus {
             outline: none;
+        }
+
+        .search-actions {
+            display: flex;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: transparent;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            transition: background 0.2s;
+        }
+
+        .icon-btn:hover {
+            background: var(--bg);
+        }
+
+        .icon-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Убираем старую FAB-кнопку на телефоне */
+        @media (max-width: 500px) {
+            .fab {
+                display: none !important;
+            }
+            .fab-menu {
+                display: none !important;
+            }
         }
 
         .contacts-list {
@@ -396,7 +437,7 @@
             margin-left: 8px;
         }
 
-        /* Кнопка добавления */
+        /* Кнопка добавления (для ПК) */
         .fab {
             position: fixed;
             bottom: 80px;
@@ -1460,7 +1501,15 @@
             <div class="contacts-screen">
                 <div class="search-bar">
                     <span>🔍</span>
-                    <input type="text" id="searchContacts" placeholder="Поиск контактов...">
+                    <input type="text" id="searchContacts" class="search-input" placeholder="Поиск контактов...">
+                    <div class="search-actions">
+                        <button class="icon-btn" onclick="showAddFriendModal()" title="Добавить друга">
+                            <span>👤</span>
+                        </button>
+                        <button class="icon-btn" onclick="showCreateGroupModal()" title="Создать группу">
+                            <span>👥</span>
+                        </button>
+                    </div>
                 </div>
                 <div id="contactsList" class="contacts-list"></div>
             </div>
@@ -1606,7 +1655,7 @@
         </div>
     </div>
 
-    <!-- Кнопка добавления (FAB) -->
+    <!-- Кнопка добавления (для ПК) -->
     <div class="fab" id="fabButton">+</div>
     <div class="fab-menu" id="fabMenu">
         <div class="fab-menu-item" onclick="showAddFriendModal()">
@@ -3484,13 +3533,18 @@
             savedScreen.classList.remove('active');
             tabButtons.forEach(btn => btn.classList.remove('active'));
             
-            // Управление FAB-кнопкой
+            // Управление FAB-кнопкой (только для ПК)
             const fab = document.getElementById('fabButton');
             const fabMenu = document.getElementById('fabMenu');
             
-            // По умолчанию скрываем FAB
-            fab.style.display = 'none';
-            fabMenu.classList.remove('active');
+            if (window.innerWidth > 500) {
+                if (screenName === 'contacts') {
+                    fab.style.display = 'flex';
+                } else {
+                    fab.style.display = 'none';
+                    fabMenu.classList.remove('active');
+                }
+            }
             
             switch(screenName) {
                 case 'auth': 
@@ -3500,19 +3554,16 @@
                 case 'contacts': 
                     contactsScreen.classList.add('active'); 
                     document.querySelector('[data-tab="contacts"]').classList.add('active'); 
-                    fab.style.display = 'flex'; // Показываем FAB только на контактах
                     break;
                     
                 case 'chats': 
                     chatsScreen.classList.add('active'); 
                     document.querySelector('[data-tab="chats"]').classList.add('active'); 
-                    // FAB скрыт в чатах
                     break;
                     
                 case 'profile': 
                     profileScreen.classList.add('active'); 
                     document.querySelector('[data-tab="profile"]').classList.add('active'); 
-                    // FAB скрыт в профиле
                     break;
                     
                 case 'saved':

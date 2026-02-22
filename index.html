@@ -406,7 +406,7 @@
             border-radius: 50%;
             background: var(--primary);
             color: white;
-            display: flex;
+            display: none;
             align-items: center;
             justify-content: center;
             font-size: 24px;
@@ -3484,22 +3484,37 @@
             savedScreen.classList.remove('active');
             tabButtons.forEach(btn => btn.classList.remove('active'));
             
+            // Управление FAB-кнопкой
+            const fab = document.getElementById('fabButton');
+            const fabMenu = document.getElementById('fabMenu');
+            
+            // По умолчанию скрываем FAB
+            fab.style.display = 'none';
+            fabMenu.classList.remove('active');
+            
             switch(screenName) {
                 case 'auth': 
                     authScreen.classList.add('active'); 
                     break;
+                    
                 case 'contacts': 
                     contactsScreen.classList.add('active'); 
                     document.querySelector('[data-tab="contacts"]').classList.add('active'); 
+                    fab.style.display = 'flex'; // Показываем FAB только на контактах
                     break;
+                    
                 case 'chats': 
                     chatsScreen.classList.add('active'); 
                     document.querySelector('[data-tab="chats"]').classList.add('active'); 
+                    // FAB скрыт в чатах
                     break;
+                    
                 case 'profile': 
                     profileScreen.classList.add('active'); 
                     document.querySelector('[data-tab="profile"]').classList.add('active'); 
+                    // FAB скрыт в профиле
                     break;
+                    
                 case 'saved':
                     savedScreen.classList.add('active');
                     break;
@@ -4253,6 +4268,7 @@
     </script>
 </body>
 </html>
+
 
 
 

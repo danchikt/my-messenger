@@ -6,7 +6,6 @@ const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const sqlite3 = require('sqlite3').verbose();
 const bcrypt = require('bcrypt');
-const axios = require('axios');
 
 const app = express();
 const server = http.createServer(app);
@@ -251,17 +250,6 @@ db.serialize(() => {
         PRIMARY KEY (story_id, user_id),
         FOREIGN KEY (story_id) REFERENCES stories(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
-    )`);
-
-    // Таблица ботов
-    db.run(`CREATE TABLE IF NOT EXISTS bots (
-        id TEXT PRIMARY KEY,
-        name TEXT NOT NULL,
-        token TEXT UNIQUE NOT NULL,
-        owner_id TEXT,
-        webhook_url TEXT,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (owner_id) REFERENCES users(id)
     )`);
 
     // Создаём админа
@@ -1316,32 +1304,6 @@ wss.on('connection', (ws) => {
                     
                     db.all(query, params, (err, messages) => {
                         ws.send(JSON.stringify({ type: 'search_results', messages: messages || [] }));
-                    });
-                    break;
-
-                case 'create_bot':
-                    if (!currentUser || currentUser.userId !== ADMIN_ID) break;
-                    
-                    const { botName, botToken, webhookUrl } = data;
-                    
-                    const botId = 'bot_' + Date.now();
-                    
-                    db.run(`INSERT INTO bots (id, name, token, owner_id, webhook_url) VALUES (?, ?, ?, ?, ?)`,
-                        [botId, botName, botToken, currentUser.userId, webhookUrl]);
-                    break;
-
-                case 'bot_message':
-                    const { botId: messageBotId, chatId: messageChatId, botText: messageBotText } = data;
-                    
-                    db.get(`SELECT * FROM bots WHERE id = ?`, [messageBotId], (err, bot) => {
-                        if (bot && bot.webhook_url) {
-                            axios.post(bot.webhook_url, {
-                                message: messageBotText,
-                                from: messageBotId,
-                                to: messageChatId,
-                                timestamp: new Date().toISOString()
-                            }).catch(e => console.log('Webhook error:', e));
-                        }
                     });
                     break;
             }

@@ -248,7 +248,7 @@
             margin-top: 10px;
         }
 
-        /* Новый поиск с кнопками */
+        /* Поиск с кнопками */
         .search-bar {
             background: var(--surface);
             border-radius: 20px;
@@ -774,11 +774,12 @@
             background: var(--primary);
             color: white;
             border: none;
-            font-size: 20px;
+            font-size: 24px;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0;
         }
 
         .attach-btn {
@@ -793,25 +794,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-        }
-
-        .self-destruct-btn {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: var(--surface);
-            color: var(--warning);
-            border: 1px solid var(--border);
-            font-size: 20px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .self-destruct-btn.active {
-            background: var(--warning);
-            color: white;
+            flex-shrink: 0;
         }
 
         .chat-header {
@@ -1417,12 +1400,6 @@
             font-style: italic;
         }
 
-        .self-destruct-timer {
-            font-size: 10px;
-            color: var(--warning);
-            margin-left: 4px;
-        }
-
         /* Адаптация для телефона */
         @media (max-width: 500px) {
             .reply-preview {
@@ -1447,6 +1424,23 @@
             
             .message {
                 max-width: 85%;
+            }
+            
+            .chat-send {
+                width: 52px;
+                height: 52px;
+                font-size: 26px;
+            }
+            
+            .attach-btn {
+                width: 52px;
+                height: 52px;
+                font-size: 24px;
+            }
+            
+            .chat-input {
+                font-size: 16px;
+                padding: 14px 18px;
             }
         }
     </style>
@@ -1562,7 +1556,6 @@
 
                 <div class="chat-input-area">
                     <button class="attach-btn" id="attachFileBtn">📎</button>
-                    <button class="self-destruct-btn" id="selfDestructBtn">⏱️</button>
                     <input type="text" id="chatInput" class="chat-input" placeholder="Сообщение..." disabled>
                     <button id="sendMessageBtn" class="chat-send" disabled>➤</button>
                 </div>
@@ -1914,28 +1907,6 @@
         </div>
     </div>
 
-    <div id="selfDestructModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-title">Самоуничтожение</div>
-            <p style="margin-bottom: 16px;">Сообщение исчезнет через:</p>
-            <div class="settings-item" onclick="setSelfDestruct(5)">
-                <span>5 секунд</span>
-            </div>
-            <div class="settings-item" onclick="setSelfDestruct(30)">
-                <span>30 секунд</span>
-            </div>
-            <div class="settings-item" onclick="setSelfDestruct(60)">
-                <span>1 минута</span>
-            </div>
-            <div class="settings-item" onclick="setSelfDestruct(300)">
-                <span>5 минут</span>
-            </div>
-            <div class="settings-item" onclick="setSelfDestruct(0)">
-                <span>Отключить</span>
-            </div>
-        </div>
-    </div>
-
     <div id="confirmModal" class="modal">
         <div class="modal-content">
             <div class="modal-title" id="confirmTitle">Подтверждение</div>
@@ -1989,7 +1960,6 @@
         let typingTimeout = null;
         let typingUsers = {};
         let stories = [];
-        let selfDestructTime = 0;
         let pollOptions = 2;
 
         // ID канала (фиксированный)
@@ -2038,7 +2008,6 @@
         const chatInput = document.getElementById('chatInput');
         const sendMessageBtn = document.getElementById('sendMessageBtn');
         const attachFileBtn = document.getElementById('attachFileBtn');
-        const selfDestructBtn = document.getElementById('selfDestructBtn');
         const chatName = document.getElementById('chatName');
         const chatStatus = document.getElementById('chatStatus');
         const chatMenuBtn = document.getElementById('chatMenuBtn');
@@ -2112,7 +2081,6 @@
         const saveMessageOption = document.getElementById('saveMessageOption');
         const searchForwardContacts = document.getElementById('searchForwardContacts');
         const forwardContactsList = document.getElementById('forwardContactsList');
-        const selfDestructModal = document.getElementById('selfDestructModal');
         
         const confirmModal = document.getElementById('confirmModal');
         const confirmTitle = document.getElementById('confirmTitle');
@@ -3335,21 +3303,12 @@
                     }
                 }
                 
-                let timerHtml = '';
-                if (msg.selfDestruct && msg.selfDestructTime) {
-                    const timeLeft = Math.max(0, msg.selfDestructTime - (Date.now() - new Date(msg.timestamp).getTime()) / 1000);
-                    if (timeLeft > 0) {
-                        timerHtml = `<span class="self-destruct-timer">⏱️ ${Math.round(timeLeft)}с</span>`;
-                    }
-                }
-                
                 msgDiv.innerHTML = `
                     ${replyHtml}
                     ${senderHtml}
                     <div>${content}</div>
                     <div class="message-time">
                         ${formatTime(msg.timestamp)}
-                        ${timerHtml}
                         ${msg.edited ? ' <span class="message-status">отредактировано</span>' : ''}
                         ${msg.from === currentUser.id ? ' ✓✓' : ''}
                     </div>
@@ -3361,7 +3320,7 @@
             chatMessages.scrollTop = chatMessages.scrollHeight;
         }
 
-        function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null, replyTo = null, selfDestruct = false, selfDestructTime = 0) {
+        function addMessage(from, to, text, timestamp, fileData = null, fileName = null, fileType = null, replyTo = null) {
             if (blockedUsers.includes(from) && from !== currentUser.id) return;
             if (!messages[to]) messages[to] = [];
             
@@ -3372,9 +3331,7 @@
                 timestamp: timestamp || new Date().toISOString(), 
                 reactions: { users: {} },
                 read: false,
-                replyTo: replyTo,
-                selfDestruct: selfDestruct,
-                selfDestructTime: selfDestructTime
+                replyTo: replyTo
             };
             
             if (fileData) { 
@@ -3388,16 +3345,6 @@
             
             if (currentChat && (currentChat.id === to)) {
                 renderMessages();
-            }
-            
-            if (selfDestruct) {
-                setTimeout(() => {
-                    messages[to] = messages[to].filter(m => m.id !== message.id);
-                    saveMessages();
-                    if (currentChat && currentChat.id === to) {
-                        renderMessages();
-                    }
-                }, selfDestructTime * 1000);
             }
             
             if (from === CHANNEL_ID || from === 'channel') {
@@ -3506,22 +3453,6 @@
             }));
             
             closeSearchModal();
-        }
-
-        // ========== САМОУНИЧТОЖЕНИЕ ==========
-        function toggleSelfDestruct() {
-            selfDestructModal.classList.toggle('active');
-        }
-
-        function setSelfDestruct(seconds) {
-            selfDestructTime = seconds;
-            if (seconds > 0) {
-                selfDestructBtn.classList.add('active');
-                showNotification(`Сообщения будут исчезать через ${seconds} секунд`, 'info');
-            } else {
-                selfDestructBtn.classList.remove('active');
-            }
-            selfDestructModal.classList.remove('active');
         }
 
         // ========== НАВИГАЦИЯ ==========
@@ -3692,7 +3623,7 @@
                         
                     case 'message':
                         console.log('💬 Новое сообщение от:', data.from);
-                        addMessage(data.from, data.from, data.text, data.timestamp, null, null, null, data.replyTo, data.selfDestruct, data.selfDestructTime);
+                        addMessage(data.from, data.from, data.text, data.timestamp, null, null, null, data.replyTo);
                         break;
                         
                     case 'file_message':
@@ -4220,8 +4151,6 @@
             showNotification('Профиль обновлен', 'success');
         };
         
-        selfDestructBtn.onclick = toggleSelfDestruct;
-        
         sendMessageBtn.onclick = () => {
             if (!socket || !currentChat || !chatInput.value) return;
             const text = chatInput.value.trim();
@@ -4250,9 +4179,7 @@
                     type: 'message', 
                     to: currentChat.id, 
                     text: text,
-                    replyTo: replyingTo?.id || null,
-                    selfDestruct: selfDestructTime > 0,
-                    selfDestructTime: selfDestructTime
+                    replyTo: replyingTo?.id || null
                 }));
                 
                 addMessage(
@@ -4261,9 +4188,7 @@
                     text, 
                     new Date().toISOString(), 
                     null, null, null, 
-                    replyingTo?.id || null,
-                    selfDestructTime > 0,
-                    selfDestructTime
+                    replyingTo?.id || null
                 );
                 
                 if (replyingTo) cancelReply();

@@ -23,6 +23,7 @@ const db = new sqlite3.Database(dbPath);
 
 // Создаём таблицы
 db.serialize(() => {
+    // Таблица пользователей
     db.run(`CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -45,6 +46,7 @@ db.serialize(() => {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
+    // Таблица друзей/контактов
     db.run(`CREATE TABLE IF NOT EXISTS friends (
         user_id TEXT,
         friend_id TEXT,
@@ -55,6 +57,7 @@ db.serialize(() => {
         FOREIGN KEY (friend_id) REFERENCES users(id)
     )`);
 
+    // Таблица сообщений
     db.run(`CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         from_id TEXT,
@@ -74,6 +77,7 @@ db.serialize(() => {
         FOREIGN KEY (reply_to) REFERENCES messages(id)
     )`);
 
+    // Таблица реакций
     db.run(`CREATE TABLE IF NOT EXISTS reactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id TEXT,
@@ -85,6 +89,7 @@ db.serialize(() => {
         UNIQUE(user_id, message_id)
     )`);
 
+    // Таблица закреплённых сообщений
     db.run(`CREATE TABLE IF NOT EXISTS pinned_messages (
         chat_id TEXT,
         message_id INTEGER,
@@ -95,6 +100,7 @@ db.serialize(() => {
         PRIMARY KEY (chat_id, message_id)
     )`);
 
+    // Таблица канала
     db.run(`CREATE TABLE IF NOT EXISTS channel_messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         content TEXT NOT NULL,
@@ -107,6 +113,7 @@ db.serialize(() => {
         FOREIGN KEY (author_id) REFERENCES users(id)
     )`);
 
+    // Таблица подписчиков канала
     db.run(`CREATE TABLE IF NOT EXISTS channel_subscribers (
         user_id TEXT,
         subscribed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -114,12 +121,14 @@ db.serialize(() => {
         PRIMARY KEY (user_id)
     )`);
 
+    // Таблица просмотров канала
     db.run(`CREATE TABLE IF NOT EXISTS channel_views (
         user_id TEXT,
         viewed_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id)
     )`);
 
+    // Таблица сохранённых сообщений
     db.run(`CREATE TABLE IF NOT EXISTS saved_messages (
         user_id TEXT,
         message_id INTEGER,
@@ -129,6 +138,7 @@ db.serialize(() => {
         PRIMARY KEY (user_id, message_id)
     )`);
 
+    // Таблица групп
     db.run(`CREATE TABLE IF NOT EXISTS groups (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -138,6 +148,7 @@ db.serialize(() => {
         FOREIGN KEY (created_by) REFERENCES users(id)
     )`);
 
+    // Таблица участников групп
     db.run(`CREATE TABLE IF NOT EXISTS group_members (
         group_id TEXT,
         user_id TEXT,
@@ -146,6 +157,26 @@ db.serialize(() => {
         PRIMARY KEY (group_id, user_id),
         FOREIGN KEY (group_id) REFERENCES groups(id),
         FOREIGN KEY (user_id) REFERENCES users(id)
+    )`);
+
+    // Таблица закреплённых контактов
+    db.run(`CREATE TABLE IF NOT EXISTS pinned_contacts (
+        user_id TEXT,
+        contact_id TEXT,
+        pinned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, contact_id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (contact_id) REFERENCES users(id)
+    )`);
+
+    // Таблица заблокированных пользователей
+    db.run(`CREATE TABLE IF NOT EXISTS blocked_users (
+        user_id TEXT,
+        blocked_id TEXT,
+        blocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, blocked_id),
+        FOREIGN KEY (user_id) REFERENCES users(id),
+        FOREIGN KEY (blocked_id) REFERENCES users(id)
     )`);
 
     // Создаём админа
@@ -171,33 +202,72 @@ app.use(express.json({ limit: '50mb' }));
 // Хранилище активных WebSocket соединений
 const clients = new Map();
 
-// Вспомогательная функция для получения списка друзей
+// ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+
+// Получить список друзей
 function getFriendsList(userId, callback) {
-    db.all(`SELECT u.* FROM users u
+    db.all(`SELECT u.*, f.status as friend_status 
+            FROM users u
             JOIN friends f ON (f.friend_id = u.id OR f.user_id = u.id)
             WHERE (f.user_id = ? OR f.friend_id = ?) 
             AND f.status = 'accepted' AND u.id != ?`,
-        [userId, userId, userId], callback);
+        [userId, userId, userId], (err, friends) => {
+            if (err) {
+                console.error('Ошибка получения друзей:', err);
+                callback([]);
+                return;
+            }
+            callback(friends || []);
+        });
 }
 
-// Вспомогательная функция для проверки приватности
-function canSeeLastSeen(viewerId, targetId, callback) {
-    db.get(`SELECT privacy_last_seen FROM users WHERE id = ?`, [targetId], (err, user) => {
-        if (err || !user) {
-            callback(false);
+// Получить заблокированных пользователей
+function getBlockedUsers(userId, callback) {
+    db.all(`SELECT blocked_id FROM blocked_users WHERE user_id = ?`, [userId], (err, blocked) => {
+        if (err) {
+            console.error('Ошибка получения заблокированных:', err);
+            callback([]);
             return;
         }
-        
-        if (user.privacy_last_seen === 'everyone') {
-            callback(true);
-        } else if (user.privacy_last_seen === 'contacts') {
-            db.get(`SELECT * FROM friends WHERE user_id = ? AND friend_id = ? AND status = 'accepted'`,
-                [targetId, viewerId], (err, friend) => {
-                    callback(!!friend);
-                });
-        } else {
-            callback(false);
+        callback(blocked.map(b => b.blocked_id));
+    });
+}
+
+// Получить закреплённые контакты
+function getPinnedContacts(userId, callback) {
+    db.all(`SELECT contact_id FROM pinned_contacts WHERE user_id = ?`, [userId], (err, pinned) => {
+        if (err) {
+            console.error('Ошибка получения закреплённых:', err);
+            callback([]);
+            return;
         }
+        callback(pinned.map(p => p.contact_id));
+    });
+}
+
+// Получить группы пользователя
+function getUserGroups(userId, callback) {
+    db.all(`SELECT g.* FROM groups g
+            JOIN group_members gm ON gm.group_id = g.id
+            WHERE gm.user_id = ?`, [userId], (err, groups) => {
+        if (err) {
+            console.error('Ошибка получения групп:', err);
+            callback([]);
+            return;
+        }
+        callback(groups || []);
+    });
+}
+
+// Получить участников группы
+function getGroupMembers(groupId, callback) {
+    db.all(`SELECT user_id FROM group_members WHERE group_id = ?`, [groupId], (err, members) => {
+        if (err) {
+            console.error('Ошибка получения участников группы:', err);
+            callback([]);
+            return;
+        }
+        callback(members.map(m => m.user_id));
     });
 }
 
@@ -229,12 +299,13 @@ app.post('/api/register', async (req, res) => {
                 
                 const token = jwt.sign({ userId, username }, JWT_SECRET);
                 
+                // Подписываем на канал
                 db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [userId]);
                 
                 res.json({ 
                     success: true, 
                     token,
-                    user: { id: userId, username, email }
+                    user: { id: userId, username, email, name: name || username, bio: bio || '' }
                 });
             }
         );
@@ -326,15 +397,24 @@ wss.on('connection', (ws) => {
                         // Обновляем статус и last_seen
                         db.run(`UPDATE users SET status = 'online', last_seen = CURRENT_TIMESTAMP WHERE id = ?`, [currentUser.userId]);
                         
-                        // Получаем контакты
-                        getFriendsList(currentUser.userId, (err, contacts) => {
+                        // Получаем все данные пользователя
+                        Promise.all([
+                            new Promise(resolve => getFriendsList(currentUser.userId, resolve)),
+                            new Promise(resolve => getBlockedUsers(currentUser.userId, resolve)),
+                            new Promise(resolve => getPinnedContacts(currentUser.userId, resolve)),
+                            new Promise(resolve => getUserGroups(currentUser.userId, resolve))
+                        ]).then(([friends, blocked, pinned, groups]) => {
                             ws.send(JSON.stringify({
                                 type: 'auth_success',
                                 user: currentUser,
-                                contacts: contacts || []
+                                contacts: friends,
+                                blocked: blocked,
+                                pinnedContacts: pinned,
+                                groups: groups
                             }));
                         });
                         
+                        // Подписываем на канал
                         db.run(`INSERT OR IGNORE INTO channel_subscribers (user_id) VALUES (?)`, [currentUser.userId]);
                         
                         // Отправляем последние сообщения канала
@@ -373,7 +453,6 @@ wss.on('connection', (ws) => {
                             if (!err) {
                                 const messageId = this.lastID;
                                 
-                                // Получаем полное сообщение с данными
                                 db.get(`SELECT * FROM messages WHERE id = ?`, [messageId], (err, message) => {
                                     if (message) {
                                         const targetSocket = clients.get(to);
@@ -520,7 +599,7 @@ wss.on('connection', (ws) => {
                             WHERE user_id = ? AND friend_id = ?`,
                         [requesterId, currentUser.userId], function(err) {
                             if (!err) {
-                                getFriendsList(currentUser.userId, (err, contacts) => {
+                                getFriendsList(currentUser.userId, (contacts) => {
                                     ws.send(JSON.stringify({ 
                                         type: 'friends_list', 
                                         friends: contacts 
@@ -529,7 +608,7 @@ wss.on('connection', (ws) => {
                                 
                                 const requesterWs = clients.get(requesterId);
                                 if (requesterWs) {
-                                    getFriendsList(requesterId, (err, contacts) => {
+                                    getFriendsList(requesterId, (contacts) => {
                                         requesterWs.send(JSON.stringify({ 
                                             type: 'friends_list', 
                                             friends: contacts 
@@ -563,16 +642,72 @@ wss.on('connection', (ws) => {
                     db.run(`DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)`,
                         [currentUser.userId, deleteId, deleteId, currentUser.userId]);
                     
-                    getFriendsList(currentUser.userId, (err, contacts) => {
+                    getFriendsList(currentUser.userId, (contacts) => {
                         ws.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
                     });
                     
                     const deletedFriendWs = clients.get(deleteId);
                     if (deletedFriendWs) {
-                        getFriendsList(deleteId, (err, contacts) => {
+                        getFriendsList(deleteId, (contacts) => {
                             deletedFriendWs.send(JSON.stringify({ type: 'friends_list', friends: contacts }));
                         });
                     }
+                    break;
+
+                case 'block_user':
+                    if (!currentUser) break;
+                    
+                    const { blockedId } = data;
+                    
+                    db.run(`INSERT OR IGNORE INTO blocked_users (user_id, blocked_id) VALUES (?, ?)`,
+                        [currentUser.userId, blockedId]);
+                    
+                    // Удаляем из друзей если есть
+                    db.run(`DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)`,
+                        [currentUser.userId, blockedId, blockedId, currentUser.userId]);
+                    
+                    getBlockedUsers(currentUser.userId, (blocked) => {
+                        ws.send(JSON.stringify({ type: 'blocked_list', blocked: blocked }));
+                    });
+                    break;
+
+                case 'unblock_user':
+                    if (!currentUser) break;
+                    
+                    const { unblockedId } = data;
+                    
+                    db.run(`DELETE FROM blocked_users WHERE user_id = ? AND blocked_id = ?`,
+                        [currentUser.userId, unblockedId]);
+                    
+                    getBlockedUsers(currentUser.userId, (blocked) => {
+                        ws.send(JSON.stringify({ type: 'blocked_list', blocked: blocked }));
+                    });
+                    break;
+
+                case 'pin_contact':
+                    if (!currentUser) break;
+                    
+                    const { contactId } = data;
+                    
+                    db.run(`INSERT OR IGNORE INTO pinned_contacts (user_id, contact_id) VALUES (?, ?)`,
+                        [currentUser.userId, contactId]);
+                    
+                    getPinnedContacts(currentUser.userId, (pinned) => {
+                        ws.send(JSON.stringify({ type: 'pinned_contacts', pinned: pinned }));
+                    });
+                    break;
+
+                case 'unpin_contact':
+                    if (!currentUser) break;
+                    
+                    const { unpinId } = data;
+                    
+                    db.run(`DELETE FROM pinned_contacts WHERE user_id = ? AND contact_id = ?`,
+                        [currentUser.userId, unpinId]);
+                    
+                    getPinnedContacts(currentUser.userId, (pinned) => {
+                        ws.send(JSON.stringify({ type: 'pinned_contacts', pinned: pinned }));
+                    });
                     break;
 
                 case 'clear_chat':
@@ -653,19 +788,18 @@ wss.on('connection', (ws) => {
                     
                     const { group } = data;
                     
-                    db.run(`INSERT INTO groups (id, name, description, created_by) VALUES (?, ?, ?, ?)`,
-                        [group.id, group.name, group.description, currentUser.userId]);
-                    
-                    db.run(`INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'creator')`,
-                        [group.id, currentUser.userId]);
-                    
-                    clients.forEach((client, userId) => {
-                        if (client && client.readyState === WebSocket.OPEN && group.members.includes(userId)) {
-                            client.send(JSON.stringify({
-                                type: 'group_created',
-                                group: group
-                            }));
-                        }
+                    db.serialize(() => {
+                        db.run(`INSERT INTO groups (id, name, description, created_by) VALUES (?, ?, ?, ?)`,
+                            [group.id, group.name, group.description, currentUser.userId]);
+                        
+                        db.run(`INSERT INTO group_members (group_id, user_id, role) VALUES (?, ?, 'creator')`,
+                            [group.id, currentUser.userId]);
+                        
+                        // Уведомляем создателя
+                        ws.send(JSON.stringify({
+                            type: 'group_created',
+                            group: group
+                        }));
                     });
                     break;
 
@@ -676,17 +810,30 @@ wss.on('connection', (ws) => {
                     
                     members.forEach(memberId => {
                         db.run(`INSERT OR IGNORE INTO group_members (group_id, user_id) VALUES (?, ?)`,
-                            [groupId, memberId]);
+                            [groupId, memberId], function(err) {
+                                if (!err) {
+                                    const memberWs = clients.get(memberId);
+                                    if (memberWs) {
+                                        db.get(`SELECT * FROM groups WHERE id = ?`, [groupId], (err, group) => {
+                                            if (group) {
+                                                memberWs.send(JSON.stringify({
+                                                    type: 'group_created',
+                                                    group: group
+                                                }));
+                                            }
+                                        });
+                                    }
+                                }
+                            });
                     });
                     
-                    clients.forEach((client, userId) => {
-                        if (client && client.readyState === WebSocket.OPEN && members.includes(userId)) {
-                            client.send(JSON.stringify({
-                                type: 'group_members_added',
-                                groupId: groupId,
-                                members: members
-                            }));
-                        }
+                    // Обновляем количество участников у текущего пользователя
+                    getGroupMembers(groupId, (membersList) => {
+                        ws.send(JSON.stringify({
+                            type: 'group_members_updated',
+                            groupId: groupId,
+                            count: membersList.length
+                        }));
                     });
                     break;
 
@@ -706,6 +853,14 @@ wss.on('connection', (ws) => {
                             memberId: memberId
                         }));
                     }
+                    
+                    getGroupMembers(kickGroupId, (membersList) => {
+                        ws.send(JSON.stringify({
+                            type: 'group_members_updated',
+                            groupId: kickGroupId,
+                            count: membersList.length
+                        }));
+                    });
                     break;
 
                 case 'delete_group':
@@ -836,8 +991,6 @@ wss.on('connection', (ws) => {
                     
                     if (forEveryone) {
                         db.run(`DELETE FROM messages WHERE id = ?`, [deleteMessageId]);
-                    } else {
-                        // TODO: удалить только у себя
                     }
                     
                     clients.forEach((client, userId) => {

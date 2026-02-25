@@ -33,6 +33,7 @@
             --saved: #9b59b6;
             --forwarded: #3498db;
             --replied: #e67e22;
+            --story: #fd79a8;
         }
 
         /* Тёмная тема */
@@ -188,7 +189,7 @@
             display: block;
         }
 
-        .auth-screen, .contacts-screen, .chats-screen, .profile-screen, .saved-screen {
+        .auth-screen, .contacts-screen, .chats-screen, .profile-screen, .saved-screen, .folders-screen, .stories-screen {
             height: 100%;
             display: flex;
             flex-direction: column;
@@ -322,6 +323,49 @@
             }
         }
 
+        /* Папки */
+        .folders-bar {
+            display: flex;
+            gap: 8px;
+            padding: 8px 0;
+            margin-bottom: 16px;
+            overflow-x: auto;
+            white-space: nowrap;
+            flex-shrink: 0;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .folder-item {
+            background: var(--surface);
+            border-radius: 20px;
+            padding: 8px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid var(--border);
+        }
+
+        .folder-item.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .folder-item.active .folder-count {
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+
+        .folder-count {
+            background: var(--bg);
+            border-radius: 12px;
+            padding: 2px 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
         .contacts-list {
             display: flex;
             flex-direction: column;
@@ -364,6 +408,10 @@
             border-left: 4px solid var(--pinned);
         }
 
+        .contact-item.has-story {
+            border: 2px solid var(--story);
+        }
+
         .contact-avatar {
             width: 48px;
             height: 48px;
@@ -376,6 +424,18 @@
             font-weight: bold;
             font-size: 20px;
             flex-shrink: 0;
+            position: relative;
+        }
+
+        .story-indicator {
+            position: absolute;
+            bottom: -2px;
+            right: -2px;
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            background: var(--story);
+            border: 2px solid var(--surface);
         }
 
         .contact-info {
@@ -739,6 +799,101 @@
             flex-shrink: 0;
         }
 
+        /* Голосовые сообщения */
+        .voice-message {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 8px 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 200px;
+        }
+
+        .voice-play-btn {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .voice-wave {
+            flex: 1;
+            height: 36px;
+            background: var(--bg);
+            border-radius: 18px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .voice-progress {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 0%;
+            background: var(--primary);
+            opacity: 0.2;
+            transition: width 0.1s linear;
+        }
+
+        .voice-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            min-width: 45px;
+            text-align: right;
+        }
+
+        .voice-record-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--error);
+            color: white;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform 0.2s;
+        }
+
+        .voice-record-btn.recording {
+            animation: pulse 1s infinite;
+            background: var(--error);
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        .voice-record-time {
+            font-size: 14px;
+            color: var(--error);
+            font-weight: 600;
+            min-width: 45px;
+            text-align: center;
+        }
+
         .message {
             max-width: 80%;
             padding: 12px 16px;
@@ -906,6 +1061,7 @@
             border-top: 1px solid var(--border);
             flex-shrink: 0;
             min-height: 72px;
+            align-items: center;
         }
 
         .chat-input {
@@ -954,6 +1110,28 @@
             flex-shrink: 0;
         }
 
+        .voice-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--surface);
+            color: var(--error);
+            border: 1px solid var(--border);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .voice-btn.recording {
+            background: var(--error);
+            color: white;
+            animation: pulse 1s infinite;
+        }
+
         .profile-header {
             background: var(--surface);
             border-radius: 20px;
@@ -977,6 +1155,10 @@
             margin: 0 auto 16px;
             cursor: pointer;
             position: relative;
+        }
+
+        .profile-avatar-large.has-story {
+            border: 3px solid var(--story);
         }
 
         .avatar-overlay {
@@ -1534,6 +1716,12 @@
                 font-size: 24px;
             }
             
+            .voice-btn {
+                width: 52px;
+                height: 52px;
+                font-size: 24px;
+            }
+            
             .chat-input {
                 font-size: 16px;
                 padding: 14px 18px;
@@ -1567,6 +1755,163 @@
                 padding: 6px 12px;
                 font-size: 13px;
             }
+        }
+
+        /* Истории */
+        .stories-screen {
+            background: var(--bg);
+        }
+
+        .stories-header {
+            padding: 16px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-shrink: 0;
+        }
+
+        .stories-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .story-card {
+            background: var(--surface);
+            border-radius: 12px;
+            overflow: hidden;
+            cursor: pointer;
+            position: relative;
+            aspect-ratio: 9/16;
+        }
+
+        .story-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .story-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 12px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.8));
+            color: white;
+        }
+
+        .story-user {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .story-time {
+            font-size: 11px;
+            opacity: 0.8;
+        }
+
+        .story-viewer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: black;
+            z-index: 2000;
+            display: none;
+            flex-direction: column;
+        }
+
+        .story-viewer.active {
+            display: flex;
+        }
+
+        .story-viewer-header {
+            padding: 16px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: white;
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10;
+            background: linear-gradient(black, transparent);
+        }
+
+        .story-viewer-close {
+            margin-left: auto;
+            cursor: pointer;
+            width: 40px;
+            height: 40px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .story-viewer-content {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .story-viewer-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .story-viewer-footer {
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            background: linear-gradient(transparent, black);
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        .story-reaction-btn {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+
+        .story-reaction-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .story-reply-input {
+            flex: 1;
+            padding: 12px 16px;
+            border-radius: 24px;
+            border: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            font-size: 16px;
+        }
+
+        .story-reply-input::placeholder {
+            color: rgba(255,255,255,0.6);
         }
     </style>
 </head>
@@ -1618,6 +1963,24 @@
 
         <div id="contactsScreen" class="main-content">
             <div class="contacts-screen">
+                <div class="folders-bar" id="foldersBar">
+                    <div class="folder-item active" data-folder="all">
+                        <span>📋 Все</span>
+                        <span class="folder-count" id="allCount">0</span>
+                    </div>
+                    <div class="folder-item" data-folder="work">
+                        <span>💼 Работа</span>
+                        <span class="folder-count" id="workCount">0</span>
+                    </div>
+                    <div class="folder-item" data-folder="friends">
+                        <span>👥 Друзья</span>
+                        <span class="folder-count" id="friendsCount">0</span>
+                    </div>
+                    <div class="folder-item" data-folder="family">
+                        <span>👨‍👩‍👧‍👦 Семья</span>
+                        <span class="folder-count" id="familyCount">0</span>
+                    </div>
+                </div>
                 <div class="search-bar">
                     <span>🔍</span>
                     <input type="text" id="searchContacts" class="search-input" placeholder="Поиск контактов...">
@@ -1679,11 +2042,35 @@
                     </div>
                 </div>
 
+                <!-- Панель записи голоса -->
+                <div id="voiceRecordPanel" class="reply-preview" style="display: none;">
+                    <div class="reply-content">
+                        <span class="voice-record-btn" id="recordVoiceBtn">🎤</span>
+                        <span class="voice-record-time" id="recordTime">0:00</span>
+                        <button class="reply-close" onclick="cancelVoiceRecord()">✕</button>
+                    </div>
+                </div>
+
                 <div class="chat-input-area">
                     <button class="attach-btn" id="attachFileBtn">📎</button>
+                    <button class="voice-btn" id="voiceBtn">🎤</button>
                     <input type="text" id="chatInput" class="chat-input" placeholder="Сообщение..." disabled>
                     <button id="sendMessageBtn" class="chat-send" disabled>➤</button>
                 </div>
+            </div>
+        </div>
+
+        <div id="storiesScreen" class="main-content">
+            <div class="stories-screen">
+                <div class="stories-header">
+                    <span class="chat-back" onclick="showScreen('contacts')">←</span>
+                    <div class="chat-header-info">
+                        <div class="chat-header-name">Истории</div>
+                        <div class="chat-header-status">Исчезают через 24 часа</div>
+                    </div>
+                    <button class="chat-header-btn" onclick="showCreateStoryModal()">➕</button>
+                </div>
+                <div id="storiesGrid" class="stories-grid"></div>
             </div>
         </div>
 
@@ -1718,6 +2105,10 @@
                         <div class="stat-value" id="savedCount">0</div>
                         <div class="stat-label">сохранено</div>
                     </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="storiesCount">0</div>
+                        <div class="stat-label">историй</div>
+                    </div>
                 </div>
 
                 <div class="settings-section">
@@ -1747,6 +2138,14 @@
                         <div class="settings-item-right">⚙️</div>
                     </div>
 
+                    <div class="settings-item" onclick="showFolderSettings()">
+                        <div class="settings-item-left">
+                            <span>📁</span>
+                            <span>Папки</span>
+                        </div>
+                        <div class="settings-item-right">⚙️</div>
+                    </div>
+
                     <div class="settings-item" onclick="openSavedScreen()">
                         <div class="settings-item-left">
                             <span>💾</span>
@@ -1769,6 +2168,7 @@
         <div class="bottom-tabs">
             <button class="tab-button active" data-tab="contacts">👥 Контакты</button>
             <button class="tab-button" data-tab="chats">💬 Чаты</button>
+            <button class="tab-button" data-tab="stories">📸 Истории</button>
             <button class="tab-button" data-tab="profile">👤 Профиль</button>
         </div>
     </div>
@@ -1782,6 +2182,9 @@
         <div class="fab-menu-item" onclick="showCreateGroupModal()">
             <span>👥</span> Создать группу
         </div>
+        <div class="fab-menu-item" onclick="showCreateStoryModal()">
+            <span>📸</span> Добавить историю
+        </div>
     </div>
 
     <!-- Панель выбора реакций -->
@@ -1792,6 +2195,25 @@
         <span class="reaction-option" onclick="addReactionToSelected('😢')">😢</span>
         <span class="reaction-option" onclick="addReactionToSelected('😡')">😡</span>
         <span class="reaction-option" onclick="addReactionToSelected('🎉')">🎉</span>
+    </div>
+
+    <!-- Просмотр историй -->
+    <div id="storyViewer" class="story-viewer">
+        <div class="story-viewer-header">
+            <div class="story-viewer-avatar" id="storyViewerAvatar"></div>
+            <div class="story-viewer-name" id="storyViewerName"></div>
+            <div class="story-viewer-close" onclick="closeStoryViewer()">✕</div>
+        </div>
+        <div class="story-viewer-content">
+            <img id="storyViewerImage" class="story-viewer-image" src="" alt="">
+        </div>
+        <div class="story-viewer-footer">
+            <button class="story-reaction-btn" onclick="reactToStory('👍')">👍</button>
+            <button class="story-reaction-btn" onclick="reactToStory('❤️')">❤️</button>
+            <button class="story-reaction-btn" onclick="reactToStory('😮')">😮</button>
+            <input type="text" class="story-reply-input" placeholder="Ответить..." id="storyReplyInput">
+            <button class="story-reaction-btn" onclick="sendStoryReply()">➤</button>
+        </div>
     </div>
 
     <!-- Модальные окна -->
@@ -1814,6 +2236,32 @@
             <div class="modal-buttons">
                 <button id="createGroupCancel" class="modal-button modal-button-secondary">Отмена</button>
                 <button id="createGroupConfirm" class="modal-button modal-button-primary">Создать</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="createStoryModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Новая история</div>
+            <input type="file" id="storyImageInput" accept="image/*" class="modal-input">
+            <textarea id="storyCaption" class="modal-input" placeholder="Подпись (необязательно)" rows="3"></textarea>
+            <div class="modal-buttons">
+                <button class="modal-button modal-button-secondary" onclick="closeStoryModal()">Отмена</button>
+                <button class="modal-button modal-button-primary" onclick="createStory()">Опубликовать</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="folderSettingsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-title">Настройка папок</div>
+            <p style="margin-bottom: 16px; color: var(--text-secondary);">Перетащите контакты в папки:</p>
+            <div class="folders-settings" style="max-height: 400px; overflow-y: auto;">
+                <!-- Здесь будет список контактов для настройки -->
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-button modal-button-secondary" onclick="closeFolderSettings()">Закрыть</button>
+                <button class="modal-button modal-button-primary" onclick="saveFolderSettings()">Сохранить</button>
             </div>
         </div>
     </div>
@@ -2084,8 +2532,20 @@
         };
         let typingTimeout = null;
         let typingUsers = {};
-        let stories = [];
+        let stories = JSON.parse(localStorage.getItem('stories')) || [];
         let pollOptions = 2;
+        let voiceRecorder = null;
+        let voiceChunks = [];
+        let voiceRecording = false;
+        let voiceTimer = null;
+        let voiceSeconds = 0;
+
+        // Папки
+        let folders = JSON.parse(localStorage.getItem('folders')) || {
+            work: [],
+            friends: [],
+            family: []
+        };
 
         // ID канала (фиксированный)
         const CHANNEL_ID = 'channel_clock';
@@ -2105,6 +2565,7 @@
         const chatsScreen = document.getElementById('chatsScreen');
         const profileScreen = document.getElementById('profileScreen');
         const savedScreen = document.getElementById('savedScreen');
+        const storiesScreen = document.getElementById('storiesScreen');
         
         const tabButtons = document.querySelectorAll('.tab-button');
         
@@ -2128,11 +2589,20 @@
         const searchContacts = document.getElementById('searchContacts');
         const fabButton = document.getElementById('fabButton');
         const fabMenu = document.getElementById('fabMenu');
+        const foldersBar = document.getElementById('foldersBar');
+        const allCount = document.getElementById('allCount');
+        const workCount = document.getElementById('workCount');
+        const friendsCount = document.getElementById('friendsCount');
+        const familyCount = document.getElementById('familyCount');
         
         const chatMessages = document.getElementById('chatMessages');
         const chatInput = document.getElementById('chatInput');
         const sendMessageBtn = document.getElementById('sendMessageBtn');
         const attachFileBtn = document.getElementById('attachFileBtn');
+        const voiceBtn = document.getElementById('voiceBtn');
+        const voiceRecordPanel = document.getElementById('voiceRecordPanel');
+        const recordVoiceBtn = document.getElementById('recordVoiceBtn');
+        const recordTime = document.getElementById('recordTime');
         const chatName = document.getElementById('chatName');
         const chatStatus = document.getElementById('chatStatus');
         const chatMenuBtn = document.getElementById('chatMenuBtn');
@@ -2152,7 +2622,15 @@
         const contactsCount = document.getElementById('contactsCount');
         const savedCount = document.getElementById('savedCount');
         const savedCountSmall = document.getElementById('savedCountSmall');
+        const storiesCount = document.getElementById('storiesCount');
         const editProfileBtn = document.getElementById('editProfileBtn');
+        
+        const storiesGrid = document.getElementById('storiesGrid');
+        const storyViewer = document.getElementById('storyViewer');
+        const storyViewerAvatar = document.getElementById('storyViewerAvatar');
+        const storyViewerName = document.getElementById('storyViewerName');
+        const storyViewerImage = document.getElementById('storyViewerImage');
+        const storyReplyInput = document.getElementById('storyReplyInput');
         
         const addFriendModal = document.getElementById('addFriendModal');
         const addFriendInput = document.getElementById('addFriendInput');
@@ -2164,6 +2642,12 @@
         const groupDescription = document.getElementById('groupDescription');
         const createGroupConfirm = document.getElementById('createGroupConfirm');
         const createGroupCancel = document.getElementById('createGroupCancel');
+        
+        const createStoryModal = document.getElementById('createStoryModal');
+        const storyImageInput = document.getElementById('storyImageInput');
+        const storyCaption = document.getElementById('storyCaption');
+        
+        const folderSettingsModal = document.getElementById('folderSettingsModal');
         
         const addToGroupModal = document.getElementById('addToGroupModal');
         const searchContactsForGroup = document.getElementById('searchContactsForGroup');
@@ -2355,6 +2839,248 @@
         function showCreateGroupModal() {
             createGroupModal.classList.add('active');
             fabMenu.classList.remove('active');
+        }
+
+        function showCreateStoryModal() {
+            createStoryModal.classList.add('active');
+            fabMenu.classList.remove('active');
+        }
+
+        // ========== ПАПКИ ==========
+        function updateFolderCounts() {
+            allCount.textContent = contacts.length;
+            workCount.textContent = folders.work.length;
+            friendsCount.textContent = folders.friends.length;
+            familyCount.textContent = folders.family.length;
+        }
+
+        function filterContactsByFolder(folder) {
+            if (folder === 'all') return contacts;
+            return contacts.filter(c => folders[folder]?.includes(c.id));
+        }
+
+        document.querySelectorAll('.folder-item').forEach(item => {
+            item.onclick = () => {
+                document.querySelectorAll('.folder-item').forEach(f => f.classList.remove('active'));
+                item.classList.add('active');
+                updateContacts();
+            };
+        });
+
+        function showFolderSettings() {
+            // Здесь можно реализовать интерфейс настройки папок
+            showNotification('Настройка папок будет доступна в следующем обновлении', 'info');
+        }
+
+        // ========== ГОЛОСОВЫЕ СООБЩЕНИЯ ==========
+        function initVoiceRecorder() {
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                showNotification('Голосовые сообщения не поддерживаются вашим браузером', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        async function startVoiceRecording() {
+            if (!initVoiceRecorder()) return;
+            
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                voiceRecorder = new MediaRecorder(stream);
+                voiceChunks = [];
+                
+                voiceRecorder.ondataavailable = (e) => {
+                    voiceChunks.push(e.data);
+                };
+                
+                voiceRecorder.onstop = () => {
+                    const audioBlob = new Blob(voiceChunks, { type: 'audio/webm' });
+                    sendVoiceMessage(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                voiceRecorder.start();
+                voiceRecording = true;
+                voiceSeconds = 0;
+                
+                voiceBtn.classList.add('recording');
+                voiceRecordPanel.style.display = 'flex';
+                
+                voiceTimer = setInterval(() => {
+                    voiceSeconds++;
+                    const mins = Math.floor(voiceSeconds / 60);
+                    const secs = voiceSeconds % 60;
+                    recordTime.textContent = `${mins}:${secs.toString().padStart(2, '0')}`;
+                }, 1000);
+                
+            } catch (e) {
+                console.error('Ошибка доступа к микрофону:', e);
+                showNotification('Не удалось получить доступ к микрофону', 'error');
+            }
+        }
+
+        function stopVoiceRecording() {
+            if (voiceRecorder && voiceRecording) {
+                voiceRecorder.stop();
+                voiceRecording = false;
+                clearInterval(voiceTimer);
+                voiceBtn.classList.remove('recording');
+                voiceRecordPanel.style.display = 'none';
+            }
+        }
+
+        function cancelVoiceRecord() {
+            if (voiceRecorder && voiceRecording) {
+                voiceRecorder.stop();
+                voiceRecording = false;
+                clearInterval(voiceTimer);
+                voiceBtn.classList.remove('recording');
+                voiceRecordPanel.style.display = 'none';
+                voiceChunks = [];
+            }
+        }
+
+        function sendVoiceMessage(audioBlob) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                if (currentChat && socket) {
+                    socket.send(JSON.stringify({
+                        type: 'file_message',
+                        to: currentChat.id,
+                        fileName: 'voice.webm',
+                        fileType: 'audio/webm',
+                        fileData: reader.result
+                    }));
+                    
+                    // Добавляем сообщение локально
+                    const message = {
+                        id: 'msg_' + Date.now() + Math.random(),
+                        from: currentUser.id,
+                        text: '🎤 Голосовое сообщение',
+                        timestamp: new Date().toISOString(),
+                        reactions: { users: {} },
+                        fileData: reader.result,
+                        fileName: 'voice.webm',
+                        fileType: 'audio/webm',
+                        isVoice: true,
+                        duration: voiceSeconds
+                    };
+                    
+                    if (!messages[currentChat.id]) messages[currentChat.id] = [];
+                    messages[currentChat.id].push(message);
+                    saveMessages();
+                    renderMessages();
+                }
+            };
+            reader.readAsDataURL(audioBlob);
+        }
+
+        voiceBtn.onclick = () => {
+            if (voiceRecording) {
+                stopVoiceRecording();
+            } else {
+                startVoiceRecording();
+            }
+        };
+
+        recordVoiceBtn.onclick = stopVoiceRecording;
+
+        // ========== ИСТОРИИ ==========
+        function createStory() {
+            const file = storyImageInput.files[0];
+            if (!file) {
+                showNotification('Выберите изображение', 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = () => {
+                const newStory = {
+                    id: 'story_' + Date.now(),
+                    userId: currentUser.id,
+                    userName: currentUser.name || currentUser.username,
+                    userAvatar: currentUser.avatar,
+                    imageUrl: reader.result,
+                    caption: storyCaption.value,
+                    timestamp: new Date().toISOString(),
+                    expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+                    views: 0,
+                    reactions: []
+                };
+                
+                stories.unshift(newStory);
+                localStorage.setItem('stories', JSON.stringify(stories));
+                
+                // Удаляем через 24 часа
+                setTimeout(() => {
+                    stories = stories.filter(s => s.id !== newStory.id);
+                    localStorage.setItem('stories', JSON.stringify(stories));
+                    updateStoriesGrid();
+                }, 24 * 60 * 60 * 1000);
+                
+                closeStoryModal();
+                updateStoriesGrid();
+                showNotification('История опубликована', 'success');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function closeStoryModal() {
+            createStoryModal.classList.remove('active');
+            storyImageInput.value = '';
+            storyCaption.value = '';
+        }
+
+        function updateStoriesGrid() {
+            storiesGrid.innerHTML = '';
+            storiesCount.textContent = stories.length;
+            
+            stories.forEach(story => {
+                const storyCard = document.createElement('div');
+                storyCard.className = 'story-card';
+                storyCard.onclick = () => openStoryViewer(story);
+                
+                storyCard.innerHTML = `
+                    <img src="${story.imageUrl}" class="story-image">
+                    <div class="story-overlay">
+                        <div class="story-user">${story.userName}</div>
+                        <div class="story-time">${formatTimeAgo(story.timestamp)}</div>
+                    </div>
+                `;
+                
+                storiesGrid.appendChild(storyCard);
+            });
+        }
+
+        function openStoryViewer(story) {
+            storyViewerAvatar.textContent = getInitials(story.userName);
+            storyViewerName.textContent = story.userName;
+            storyViewerImage.src = story.imageUrl;
+            storyViewer.classList.add('active');
+        }
+
+        function closeStoryViewer() {
+            storyViewer.classList.remove('active');
+        }
+
+        function reactToStory(reaction) {
+            showNotification(`Реакция ${reaction}`, 'info');
+        }
+
+        function sendStoryReply() {
+            const reply = storyReplyInput.value;
+            if (reply) {
+                showNotification('Ответ отправлен', 'success');
+                storyReplyInput.value = '';
+            }
+        }
+
+        function formatTimeAgo(timestamp) {
+            const diff = Date.now() - new Date(timestamp).getTime();
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            if (hours < 1) return 'только что';
+            if (hours < 24) return `${hours}ч назад`;
+            return 'более дня назад';
         }
 
         // ========== ИЗБРАННОЕ ==========
@@ -3384,6 +4110,16 @@
                 if (msg.fileData) {
                     if (msg.fileType?.startsWith('image/')) {
                         content = `<img src="${msg.fileData}" class="file-preview" onclick="window.open('${msg.fileData}')">`;
+                    } else if (msg.isVoice) {
+                        content = `
+                            <div class="voice-message">
+                                <button class="voice-play-btn" onclick="playVoiceMessage('${msg.id}')">▶</button>
+                                <div class="voice-wave" id="wave-${msg.id}">
+                                    <div class="voice-progress" id="progress-${msg.id}"></div>
+                                </div>
+                                <span class="voice-time">${Math.floor(msg.duration / 60)}:${(msg.duration % 60).toString().padStart(2, '0')}</span>
+                            </div>
+                        `;
                     } else {
                         content = `<div class="file-message" onclick="window.open('${msg.fileData}')"><span class="file-icon">📎</span><div><div>${msg.fileName || 'Файл'}</div><div class="file-name">Нажмите для скачивания</div></div></div>`;
                     }
@@ -3587,6 +4323,7 @@
             chatsScreen.classList.remove('active');
             profileScreen.classList.remove('active');
             savedScreen.classList.remove('active');
+            storiesScreen.classList.remove('active');
             tabButtons.forEach(btn => btn.classList.remove('active'));
             
             // Управление FAB-кнопкой (только для ПК)
@@ -3615,6 +4352,12 @@
                 case 'chats': 
                     chatsScreen.classList.add('active'); 
                     document.querySelector('[data-tab="chats"]').classList.add('active'); 
+                    break;
+                    
+                case 'stories': 
+                    storiesScreen.classList.add('active'); 
+                    document.querySelector('[data-tab="stories"]').classList.add('active'); 
+                    updateStoriesGrid();
                     break;
                     
                 case 'profile': 
@@ -3973,6 +4716,7 @@
                         
                     case 'new_story':
                         stories.push(data);
+                        localStorage.setItem('stories', JSON.stringify(stories));
                         break;
                         
                     case 'error':
@@ -4013,15 +4757,26 @@
             }
             updateContacts();
             updateSavedCount();
+            updateFolderCounts();
+            updateStoriesGrid();
         }
 
         function updateContacts() {
             const searchTerm = searchContacts?.value?.toLowerCase() || '';
+            const activeFolder = document.querySelector('.folder-item.active')?.dataset.folder || 'all';
+            
+            let filteredContacts = filterContactsByFolder(activeFolder);
+            
+            filteredContacts = filteredContacts.filter(c => 
+                (c.name || '').toLowerCase().includes(searchTerm) || 
+                (c.username || '').toLowerCase().includes(searchTerm)
+            );
+            
             contactsList.innerHTML = '';
             
             if (!currentUser) return;
             
-            // Канал
+            // Канал (всегда показываем)
             const channelEl = document.createElement('div');
             channelEl.className = 'contact-item';
             channelEl.innerHTML = `
@@ -4058,7 +4813,7 @@
             });
             
             // Закреплённые контакты
-            const pinned = contacts.filter(c => pinnedContacts.includes(c.id));
+            const pinned = filteredContacts.filter(c => pinnedContacts.includes(c.id));
             if (pinned.length > 0) {
                 const pinnedSection = document.createElement('div');
                 pinnedSection.className = 'contacts-section';
@@ -4066,10 +4821,14 @@
                 
                 pinned.forEach(contact => {
                     const isBlocked = blockedUsers.includes(contact.id);
+                    const hasStory = stories.some(s => s.userId === contact.id && Date.now() - new Date(s.timestamp).getTime() < 24 * 60 * 60 * 1000);
                     const el = document.createElement('div');
-                    el.className = 'contact-item pinned';
+                    el.className = `contact-item pinned ${hasStory ? 'has-story' : ''}`;
                     el.innerHTML = `
-                        <div class="contact-avatar">${getInitials(contact.name || contact.username)}</div>
+                        <div class="contact-avatar">
+                            ${getInitials(contact.name || contact.username)}
+                            ${hasStory ? '<span class="story-indicator"></span>' : ''}
+                        </div>
                         <div class="contact-info">
                             <div class="contact-name">${contact.name || contact.username}${isBlocked ? ' <span class="blocked-badge">заблокирован</span>' : ''}</div>
                             <div class="contact-status">${contact.status === 'online' ? '🟢 в сети' : '⚫ не в сети'}</div>
@@ -4084,23 +4843,23 @@
             }
             
             // Обычные контакты
-            const regular = contacts.filter(c => !pinnedContacts.includes(c.id));
-            const filtered = regular.filter(c => 
-                (c.name || '').toLowerCase().includes(searchTerm) || 
-                (c.username || '').toLowerCase().includes(searchTerm)
-            );
+            const regular = filteredContacts.filter(c => !pinnedContacts.includes(c.id));
             
-            if (filtered.length > 0) {
+            if (regular.length > 0) {
                 const regularSection = document.createElement('div');
                 regularSection.className = 'contacts-section';
                 regularSection.innerHTML = '<div class="section-title">Контакты</div>';
                 
-                filtered.forEach(contact => {
+                regular.forEach(contact => {
                     const isBlocked = blockedUsers.includes(contact.id);
+                    const hasStory = stories.some(s => s.userId === contact.id && Date.now() - new Date(s.timestamp).getTime() < 24 * 60 * 60 * 1000);
                     const el = document.createElement('div');
-                    el.className = 'contact-item';
+                    el.className = `contact-item ${hasStory ? 'has-story' : ''}`;
                     el.innerHTML = `
-                        <div class="contact-avatar">${getInitials(contact.name || contact.username)}</div>
+                        <div class="contact-avatar">
+                            ${getInitials(contact.name || contact.username)}
+                            ${hasStory ? '<span class="story-indicator"></span>' : ''}
+                        </div>
                         <div class="contact-info">
                             <div class="contact-name">${contact.name || contact.username}${isBlocked ? ' <span class="blocked-badge">заблокирован</span>' : ''}</div>
                             <div class="contact-status">${contact.status === 'online' ? '🟢 в сети' : '⚫ не в сети'}</div>
@@ -4355,6 +5114,14 @@
             }
         }, 30000);
 
+        // Очистка просроченных историй
+        setInterval(() => {
+            const now = Date.now();
+            stories = stories.filter(s => now - new Date(s.timestamp).getTime() < 24 * 60 * 60 * 1000);
+            localStorage.setItem('stories', JSON.stringify(stories));
+            updateStoriesGrid();
+        }, 60 * 60 * 1000); // Каждый час
+
         // ========== ИНИЦИАЛИЗАЦИЯ ==========
         applyTheme();
         updateSavedCount();
@@ -4369,6 +5136,7 @@
     </script>
 </body>
 </html>
+
 
 
 
